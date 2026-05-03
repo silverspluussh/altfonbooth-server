@@ -1,0 +1,39 @@
+<?php
+
+if (!function_exists('send_sms_mnotify')) {
+
+    function send_sms_mnotify($to, $message)
+    {
+        $apiKey = config('services.mnotify.key');
+        $sender = config('services.mnotify.sender');
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::post("https://api.mnotify.com/api/sms/quick?key={$apiKey}", [
+                'recipient' => $to,
+                'sender' => $sender,
+                'message' => $message,
+            ]);
+
+            if ($response->failed()) {
+                \Illuminate\Support\Facades\Log::error('SMS sending failed: ' . $response->body());
+            }
+
+            return $response->body();
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('SMS sending failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+}
+
+if (!function_exists('send_email_otp')) {
+
+    function send_email_otp($email, $otp)
+    {
+        try {
+            \Illuminate\Support\Facades\Mail::to($email)->queue(new \App\Mail\OtpMail($otp));
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Email sending failed: ' . $e->getMessage());
+        }
+    }
+}
