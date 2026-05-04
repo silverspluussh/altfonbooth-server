@@ -47,9 +47,9 @@ class AuthController extends Controller
 
         send_sms_mnotify($request->phonenumber, "Your OTP Code: $otp");
 
-        if ($request->emailaddress) {
-            send_email_otp($request->emailaddress, $otp);
-        }
+        // if ($request->emailaddress) {
+        //     send_email_otp($request->emailaddress, $otp);
+        // }
 
         return response()->json([
             'status' => true,
