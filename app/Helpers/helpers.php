@@ -7,9 +7,15 @@ if (!function_exists('send_sms_mnotify')) {
         $apiKey = config('services.mnotify.key');
         $sender = config('services.mnotify.sender');
 
+        // Format phone number (e.g., 024XXXXXXX to 23324XXXXXXX)
+        $to = preg_replace('/[^0-9]/', '', $to);
+        if (str_starts_with($to, '0') && strlen($to) == 10) {
+            $to = '233' . substr($to, 1);
+        }
+
         try {
             $response = \Illuminate\Support\Facades\Http::post("https://api.mnotify.com/api/sms/quick?key={$apiKey}", [
-                'recipient' => $to,
+                'recipient' => [$to], // mNotify often expects an array of recipients
                 'sender' => $sender,
                 'message' => $message,
             ]);
