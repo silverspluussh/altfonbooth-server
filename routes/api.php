@@ -7,9 +7,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 
-Route::post('/signup', [AuthController::class, 'signup']);
+Route::post('/signup', [AuthController::class, 'signup'])->name('register');
 Route::post('/verify', [AuthController::class, 'verify']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->name('login');
 Route::post('/password/request', [AuthController::class, 'requestPasswordReset']);
 Route::post('/password/reset', [AuthController::class, 'resetPassword']);
 
