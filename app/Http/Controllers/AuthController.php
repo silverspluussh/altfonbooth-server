@@ -53,7 +53,9 @@ class AuthController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Temp subscriber created. OTP sent'
+            'message' => 'Temp subscriber created. OTP sent',
+            'debug_otp' => $otp,
+
         ], 201);
     }
 
