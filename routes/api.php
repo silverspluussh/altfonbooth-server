@@ -17,7 +17,7 @@ Route::post('/password/reset', [AuthController::class, 'resetPassword']);
 Route::middleware('auth:sanctum')->group(function () {
     // Current Authenticated User (Subscriber)
     Route::get('/user', function (Request $request) {
-        return $request->user();
+        return new \App\Http\Resources\SubscriberResource($request->user());
     });
 
     // Subscriber specific actions
