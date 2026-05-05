@@ -15,7 +15,7 @@ if (!function_exists('send_sms_mnotify')) {
 
         try {
             $response = \Illuminate\Support\Facades\Http::post("https://api.mnotify.com/api/sms/quick?key=$apiKey", [
-                'recipient' => $to,
+                'recipient' => [$to], // mNotify often expects an array of recipients
                 'sender' => $sender,
                 'message' => $message,
             ]);
