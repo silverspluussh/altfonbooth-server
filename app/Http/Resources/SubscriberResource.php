@@ -18,6 +18,7 @@ class SubscriberResource extends JsonResource
             'emailaddress' => $this->emailaddress,
             'country' => $this->country,
             'authusername' => $this->authusername,
+            'authpassword' => $this->auth?->authpassword,
             'switch_status' => $this->switch_status,
             'billing_acc_status' => $this->billing_acc_status,
             'regdatetime' => $this->regdatetime,

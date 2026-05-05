@@ -38,4 +38,9 @@ class SubscribersModel extends Model
     {
         return $this->where('subscriberid', $subscriberid)->first();
     }
+
+    public function auth()
+    {
+        return $this->hasOne(SubscriberAuthModel::class, 'subscriberid', 'subscriberid');
+    }
 }
