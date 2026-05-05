@@ -77,21 +77,24 @@ class SubscribersController extends Controller
      */
     public function addAuthUser(Request $request): JsonResponse
     {
-        $plainPassword = $request->password ?: Str::random(10);
-        $authUsername = random_int(1000000, 9999999);
+        $request->validate([
+            'authusername' => 'required|string|unique:subscriber_auth,authusername',
+            'password' => 'nullable|string'
+        ]);
 
+        $plainPassword = $request->password ?: Str::random(10);
         $subscriber = $request->user();
 
         $auth = SubscriberAuthModel::create([
             'subscriberid' => $subscriber->subscriberid,
-            'authusername' => $authUsername,
+            'authusername' => $request->authusername,
             'authpassword' => $plainPassword,
             'status' => 'active'
         ]);
 
         return response()->json([
             'status' => true,
-            'authusername' => $authUsername,
+            'authusername' => $request->authusername,
             'authpassword' => $plainPassword
         ], 201);
     }
