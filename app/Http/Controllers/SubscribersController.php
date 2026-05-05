@@ -40,6 +40,11 @@ class SubscribersController extends Controller
         ]);
 
         $subscriber = $request->user();
+        
+        // 1. Update the main subscriber record
+        $subscriber->update(['authusername' => $request->authusername]);
+
+        // 2. Update or Create the detailed auth record
         $existing = SubscriberAuthModel::where('subscriberid', $subscriber->subscriberid)->first();
 
         if ($existing) {
@@ -56,7 +61,7 @@ class SubscribersController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Auth username updated/added successfully'
+            'message' => 'Auth username updated successfully in both user profile and auth records'
         ]);
     }
 
