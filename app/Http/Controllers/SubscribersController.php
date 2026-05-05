@@ -111,8 +111,13 @@ class SubscribersController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Destination added successfully',
-            'data' => new SubscriberDestResource($dest)
-        ]);
+            'data' => [
+                'id' => $dest->id,
+                'authusername' => $dest->authusername,
+                'destination' => $dest->destination,
+                'status' => $dest->status
+            ]
+        ], 201);
     }
 
 

@@ -140,6 +140,14 @@ ALTER TABLE `subscriber_auth`
   ADD KEY `fk_subscriber` (`subscriberid`);
 
 --
+-- Indexes for table `subscriber_dest`
+--
+ALTER TABLE `subscriber_dest`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `fk_subscriber_dest` (`subscriberid`);
+
+
+--
 -- AUTO_INCREMENT for dumped tables
 --
 
@@ -160,6 +168,13 @@ ALTER TABLE `subscribers_temp`
 --
 ALTER TABLE `subscriber_auth`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+
+--
+-- AUTO_INCREMENT for table `subscriber_dest`
+--
+ALTER TABLE `subscriber_dest`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
 
 --
 -- Constraints for dumped tables
