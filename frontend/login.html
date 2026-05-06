@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>Altfon VOIP Technologies</title>
+
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/animate-custom.css">
+  <link rel="stylesheet" href="css/font-awesome.min.css">
+  <link rel="stylesheet" href="css/vendor/component.css">
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700,800" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Poppins:300,400,500,600,700" rel="stylesheet">
+  <style>
+    .login-container {
+        padding: 100px 0;
+        background: #f9f9f9;
+    }
+    .login-card {
+        background: #fff;
+        padding: 40px;
+        border-radius: 10px;
+        box-shadow: 0 5px 25px rgba(0,0,0,0.05);
+        max-width: 450px;
+        margin: 0 auto;
+    }
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: 600; }
+    .form-control { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; }
+    .btn-submit { background: #010a4c; color: #fff; border: none; padding: 12px 30px; border-radius: 5px; cursor: pointer; width: 100%; font-weight: 700; }
+  </style>
+<link rel="stylesheet" href="css/style.css"></head>
+<body>
+<header class="l-header creative-layout">
+  <div class="sticky">
+    <nav class="top-bar" data-topbar="">
+      <div class="page-section home-page large-1 columns" id="page-content">
+        <ul class="title-area ">
+          <li class="name">
+            <h1><a href="index" rel="home" title="Voip" class="active">Altfon</a></h1>
+          </li>
+        </ul>
+      </div>
+      <section class="creative top-bar-section large-9 columns">
+        <div class="menu-main-men-container">
+          <ul id="menu-main-men" class="menu right">
+            <li><a href="index">Home</a></li>
+            <li><a href="services">Services</a></li>
+            <li><a href="about">About Us</a></li>
+            <li><a href="contact">Contact Us</a></li>
+          </ul>
+        </div>
+      </section>
+    </nav>
+  </div>
+</header>
+
+<section class="login-container">
+  <div class="row">
+    <div class="large-12 columns">
+      <div class="login-card">
+        <h2 class="text-center">Login to your Account</h2>
+        <p class="text-center" style="margin-bottom: 30px;">Enter your credentials to access the Altfon Booth dashboard.</p>
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <label>Username or Email</label>
+                <input type="text" id="identifier" class="form-control" placeholder="Username" required>
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="password" class="form-control" placeholder="Password" required>
+            </div>
+            <button type="submit" class="btn-submit">LOGIN NOW</button>
+        </form>
+        
+        <p class="text-center" style="margin-top: 20px;">
+            Don't have an account? <a href="signup" style="color: #010a4c; font-weight: 700;">Signup Here</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="l-footer-columns">
+  <div class="row">
+    <section class="block">
+      <div class="large-12 columns text-center">
+        <p>© 2026 Altfon Booth. All rights reserved.</p>
+      </div>
+    </section>
+  </div>
+</footer>
+
+<script src="js/jquery.js"></script>
+<script src="js/altfon.js"></script>
+<script src="js/altfon.js"></script>
+<script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button');
+        btn.disabled = true;
+        btn.innerText = 'AUTHENTICATING...';
+
+        try {
+            const response = await apiRequest('/login', {
+                method: 'POST',
+                body: JSON.stringify({
+                    username: document.getElementById('identifier').value,
+                    password: document.getElementById('password').value
+                })
+            });
+
+            Auth.setToken(response.token);
+            Auth.setUser(response.user);
+            UI.showToast('Login successful! Redirecting...');
+            
+            setTimeout(() => {
+                window.location.href = 'dashboard';
+            }, 1000);
+
+        } catch (error) {
+            UI.showToast(error.message, 'error');
+            btn.disabled = false;
+            btn.innerText = 'LOGIN NOW';
+        }
+    });
+</script>
+</body>
+</html>

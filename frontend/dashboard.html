@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>Dashboard | Altfon VOIP Technologies</title>
+
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/animate-custom.css">
+  <link rel="stylesheet" href="css/font-awesome.min.css">
+  <link rel="stylesheet" href="css/vendor/component.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700,800" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Poppins:300,400,500,600,700" rel="stylesheet">
+  <style>
+    body { background-color: #f8f9fa; }
+    .dash-header { background: #010a4c; color: #fff; padding: 60px 0; margin-bottom: -40px; }
+    .dash-content { padding-bottom: 60px; position: relative; z-index: 2; }
+    .stat-box { background: #fff; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); text-align: center; margin-bottom: 30px; border: 1px solid rgba(0,0,0,0.03); }
+    .stat-box h3 { margin: 15px 0 5px; color: #010a4c; font-weight: 800; font-size: 1.8rem; }
+    .stat-box p { color: #6c757d; font-weight: 700; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 1px; margin: 0; }
+    .dest-card { background: #fff; border-radius: 15px; padding: 0; box-shadow: 0 10px 30px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid rgba(0,0,0,0.03); }
+    .dest-table { width: 100%; border-collapse: collapse; }
+    .dest-table th, .dest-table td { padding: 20px; text-align: left; border-bottom: 1px solid #f1f1f1; }
+    .dest-table th { background: #fafafa; color: #6c757d; font-size: 0.8rem; text-transform: uppercase; font-weight: 700; }
+    .btn-action { background: #010a4c; color: #fff; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 700; transition: all 0.3s; }
+    .btn-action:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(1, 10, 76, 0.3); }
+    .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(1, 10, 76, 0.8); z-index:9999; align-items:center; justify-content:center; backdrop-filter: blur(5px); }
+    .badge-active { background: #e7f5ea; color: #010a4c; padding: 5px 12px; border-radius: 20px; font-weight: 800; font-size: 0.7rem; }
+  </style>
+</head>
+<body>
+<header class="l-header creative-layout">
+  <div class="sticky">
+    <nav class="top-bar" data-topbar="">
+      <div class="page-section home-page large-1 columns" id="page-content">
+        <ul class="title-area ">
+          <li class="name">
+            <h1><a href="index" rel="home" title="Altfon VOIP Technologies">Altfon</a></h1>
+          </li>
+        </ul>
+      </div>
+      <section class="creative top-bar-section large-11 columns">
+        <ul class="menu right">
+            <li><a href="javascript:Auth.logout()" style="color: #fff; font-weight: 800; opacity: 0.8;">LOGOUT</a></li>
+        </ul>
+      </section>
+    </nav>
+  </div>
+</header>
+
+<section class="dash-header">
+    <div class="row">
+        <div class="large-12 columns">
+            <h1 id="welcomeTitle" style="color: #fff; font-size: 3rem; margin-bottom: 10px;">Hello, ...</h1>
+            <p style="color: rgba(255,255,255,0.7); font-size: 1.1rem;">Manage your Altfon Booth VoIP destinations and credentials.</p>
+        </div>
+    </div>
+</section>
+
+<section class="dash-content">
+    <div class="row">
+        <!-- Stats -->
+        <div class="large-4 columns">
+            <div class="stat-box animated fadeInUp">
+                <p>VoIP Username</p>
+                <h3 id="authUsername">...</h3>
+            </div>
+        </div>
+        <div class="large-4 columns">
+            <div class="stat-box animated fadeInUp" style="animation-delay: 0.1s;">
+                <p>VoIP Password</p>
+                <h3 id="authPassword">••••••••</h3>
+                <a href="javascript:togglePassword()" id="passBtn" style="color: #010a4c; font-weight: 800; font-size: 0.75rem; text-decoration: underline;">SHOW PASSWORD</a>
+            </div>
+        </div>
+        <div class="large-4 columns">
+            <div class="stat-box animated fadeInUp" style="animation-delay: 0.2s;">
+                <p>Total Destinations</p>
+                <h3 id="destCount">0</h3>
+            </div>
+        </div>
+
+        <!-- Destinations -->
+        <div class="large-12 columns">
+            <div class="dest-card animated fadeIn" style="animation-delay: 0.3s;">
+                <div style="padding: 25px 30px; border-bottom: 1px solid #f1f1f1; display: flex; justify-content: space-between; align-items: center;">
+                    <h4 style="margin: 0; font-weight: 800; color: #010a4c;">My Destinations</h4>
+                    <button class="btn-action" onclick="document.getElementById('addModal').style.display='flex'">+ ADD NEW</button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="dest-table">
+                        <thead>
+                            <tr>
+                                <th>Auth User</th>
+                                <th>Destination Number</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="destTableBody">
+                            <tr><td colspan="4" class="text-center">Loading your destinations...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Add Modal -->
+<div id="addModal" class="modal">
+    <div style="background: #fff; padding: 40px; border-radius: 20px; width: 90%; max-width: 450px; box-shadow: 0 20px 50px rgba(0,0,0,0.3);">
+        <h3 style="color: #010a4c; font-weight: 800;">Add New Destination</h3>
+        <p style="color: #6c757d; margin-bottom: 25px;">Enter the phone number you want to route calls to.</p>
+        <form id="addDestForm">
+            <div style="margin-bottom: 25px;">
+                <label style="font-weight: 700; color: #010a4c; display: block; margin-bottom: 8px;">Destination Number</label>
+                <input type="text" id="destinationNumber" style="width: 100%; padding: 15px; border: 2px solid #eee; border-radius: 10px; font-size: 1rem;" placeholder="e.g. 233240000000" required>
+            </div>
+            <div style="display: flex; gap: 15px;">
+                <button type="button" class="btn-action" style="background: #f1f1f1; color: #6c757d; flex: 1;" onclick="document.getElementById('addModal').style.display='none'">CANCEL</button>
+                <button type="submit" class="btn-action" style="flex: 1;">SAVE DESTINATION</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="js/jquery.js"></script>
+<script src="js/altfon.js"></script>
+<script src="js/altfon.js"></script>
+<script>
+    let currentUser = null;
+    let showPass = false;
+
+    async function init() {
+        if (!Auth.isAuthenticated()) { window.location.href = 'login'; return; }
+        try {
+            const response = await apiRequest('/user');
+            // Support both direct data and wrapped data
+            currentUser = response.data || response;
+            
+            document.getElementById('welcomeTitle').innerText = `Hello, ${currentUser.fullname || 'Subscriber'}`;
+            document.getElementById('authUsername').innerText = currentUser.authusername || 'Not Set';
+            
+            const destData = await apiRequest('/my-destinations');
+            renderDestinations(destData.destinations || []);
+            document.getElementById('destCount').innerText = destData.count || 0;
+        } catch (error) { 
+            console.error(error);
+            UI.showToast('Session expired, please login again', 'error');
+            setTimeout(() => Auth.logout(), 2000);
+        }
+    }
+
+    function togglePassword() {
+        showPass = !showPass;
+        const passEl = document.getElementById('authPassword');
+        const btnEl = document.getElementById('passBtn');
+        if (showPass) {
+            passEl.innerText = currentUser.authpassword || 'Not Available';
+            btnEl.innerText = 'HIDE PASSWORD';
+        } else {
+            passEl.innerText = '••••••••';
+            btnEl.innerText = 'SHOW PASSWORD';
+        }
+    }
+
+    function renderDestinations(list) {
+        const tbody = document.getElementById('destTableBody');
+        if (!list || list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 40px; color: #6c757d;">No destinations found. Add your first one above!</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = '';
+        list.forEach(item => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td style="font-weight: 600;">${item.authusername}</td>
+                <td style="font-family: monospace; font-size: 1.1rem;">${item.destination}</td>
+                <td><span class="badge-active">${item.status.toUpperCase()}</span></td>
+                <td>
+                    <button onclick="deleteDest('${item.authusername}', '${item.destination}')" style="background: none; border: none; color: #DC3545; font-weight: 800; cursor: pointer; font-size: 0.8rem;">
+                        <i class="fa fa-trash"></i> DELETE
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    document.getElementById('addDestForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const dest = document.getElementById('destinationNumber').value;
+        const btn = e.target.querySelector('button[type="submit"]');
+        
+        try {
+            btn.disabled = true;
+            btn.innerText = 'SAVING...';
+            
+            await apiRequest('/destinations', {
+                method: 'POST',
+                body: JSON.stringify({ 
+                    authusername: currentUser.authusername, 
+                    destination: dest 
+                })
+            });
+            
+            UI.showToast('Destination added successfully!');
+            document.getElementById('addModal').style.display = 'none';
+            document.getElementById('destinationNumber').value = '';
+            init();
+        } catch (error) { 
+            UI.showToast(error.message, 'error'); 
+        } finally {
+            btn.disabled = false;
+            btn.innerText = 'SAVE DESTINATION';
+        }
+    });
+
+    async function deleteDest(authUser, dest) {
+        if (!confirm(`Are you sure you want to delete destination ${dest}?`)) return;
+        try {
+            await apiRequest('/destinations', { 
+                method: 'DELETE', 
+                body: JSON.stringify({ authusername: authUser, destination: dest }) 
+            });
+            UI.showToast('Destination deleted');
+            init();
+        } catch (error) { UI.showToast(error.message, 'error'); }
+    }
+
+    // Modal Close on Background Click
+    window.onclick = function(event) {
+        const modal = document.getElementById('addModal');
+        if (event.target == modal) {
+            modal.style.display = "none";
+        }
+    }
+
+    init();
+</script>
+</body>
+</html>

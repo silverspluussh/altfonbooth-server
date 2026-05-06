@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>Altfon VOIP Technologies</title>
+
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/animate-custom.css">
+  <link rel="stylesheet" href="css/font-awesome.min.css">
+  <link rel="stylesheet" href="css/vendor/component.css">
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700,800" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Poppins:300,400,500,600,700" rel="stylesheet">
+  <style>
+    .signup-container { padding: 100px 0; background: #f9f9f9; }
+    .signup-card { background: #fff; padding: 40px; border-radius: 10px; box-shadow: 0 5px 25px rgba(0,0,0,0.05); max-width: 600px; margin: 0 auto; }
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: 600; }
+    .form-control { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; }
+    .btn-submit { background: #010a4c; color: #fff; border: none; padding: 12px 30px; border-radius: 5px; cursor: pointer; width: 100%; font-weight: 700; }
+    .step { display: none; }
+    .step.active { display: block; }
+  </style>
+<link rel="stylesheet" href="css/style.css"></head>
+<body>
+<header class="l-header creative-layout">
+  <div class="sticky">
+    <nav class="top-bar" data-topbar="">
+      <div class="page-section home-page large-1 columns" id="page-content">
+        <ul class="title-area ">
+          <li class="name">
+            <h1><a href="index" rel="home" title="Voip">Altfon</a></h1>
+          </li>
+        </ul>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<section class="signup-container">
+  <div class="row">
+    <div class="large-12 columns">
+      <div class="signup-card">
+        
+        <!-- Step 1: Account Info -->
+        <div id="signupStep" class="step active">
+            <h2 class="text-center">Create Your Account</h2>
+            <p class="text-center" style="margin-bottom: 30px;">Join Altfon Booth today and start calling.</p>
+            <form id="signupForm">
+                <div class="row">
+                    <div class="large-6 columns">
+                        <div class="form-group">
+                            <label>Full Name</label>
+                            <input type="text" id="fullname" class="form-control" placeholder="John Doe" required>
+                        </div>
+                    </div>
+                    <div class="large-6 columns">
+                        <div class="form-group">
+                            <label>Username</label>
+                            <input type="text" id="username" class="form-control" placeholder="johndoe" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Phone Number</label>
+                    <input type="tel" id="phonenumber" class="form-control" placeholder="0240000000" required>
+                </div>
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="emailaddress" class="form-control" placeholder="john@example.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="password" class="form-control" placeholder="Password" required>
+                </div>
+                <button type="submit" class="btn-submit">SEND VERIFICATION CODE</button>
+            </form>
+        </div>
+
+        <!-- Step 2: OTP Verification -->
+        <div id="verifyStep" class="step">
+            <h2 class="text-center">Verify Your Phone</h2>
+            <p class="text-center" style="margin-bottom: 30px;">Enter the 6-digit code sent to your phone.</p>
+            <form id="verifyForm">
+                <div class="form-group">
+                    <input type="text" id="otp" class="form-control" placeholder="000000" style="text-align: center; font-size: 2rem; font-weight: 800;" maxlength="6" required>
+                </div>
+                <button type="submit" class="btn-submit">VERIFY & ACTIVATE</button>
+            </form>
+        </div>
+
+        <p class="text-center" style="margin-top: 20px;">
+            Already have an account? <a href="login" style="color: #010a4c; font-weight: 700;">Login Here</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script src="js/jquery.js"></script>
+<script src="js/altfon.js"></script>
+<script src="js/altfon.js"></script>
+<script>
+    let userData = {};
+    document.getElementById('signupForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button');
+        btn.disabled = true;
+        btn.innerText = 'SENDING OTP...';
+
+        userData = {
+            fullname: document.getElementById('fullname').value,
+            username: document.getElementById('username').value,
+            phonenumber: document.getElementById('phonenumber').value,
+            emailaddress: document.getElementById('emailaddress').value,
+            password: document.getElementById('password').value,
+            country: 'Ghana'
+        };
+
+        try {
+            await apiRequest('/signup', { method: 'POST', body: JSON.stringify(userData) });
+            UI.showToast('OTP sent successfully!');
+            document.getElementById('signupStep').classList.remove('active');
+            document.getElementById('verifyStep').classList.add('active');
+        } catch (error) {
+            UI.showToast(error.message, 'error');
+            btn.disabled = false;
+            btn.innerText = 'SEND VERIFICATION CODE';
+        }
+    });
+
+    document.getElementById('verifyForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button');
+        btn.disabled = true;
+        btn.innerText = 'VERIFYING...';
+
+        try {
+            await apiRequest('/verify', {
+                method: 'POST',
+                body: JSON.stringify({ phonenumber: userData.phonenumber, otp: document.getElementById('otp').value })
+            });
+            UI.showToast('Account verified! Please login.');
+            setTimeout(() => { window.location.href = 'login'; }, 1500);
+        } catch (error) {
+            UI.showToast(error.message, 'error');
+            btn.disabled = false;
+            btn.innerText = 'VERIFY & ACTIVATE';
+        }
+    });
+</script>
+</body>
+</html>
