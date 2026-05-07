@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Resources\SubscriberAuthResource;
 use App\Http\Resources\SubscriberDestResource;
 use App\Http\Resources\SubscriberResource;
+use App\Models\PrepaidCredit;
 use App\Models\SubscriberAuthModel;
 use App\Models\SubscriberDestModel;
 use App\Models\SubscribersModel;
@@ -36,7 +37,7 @@ class SubscribersController extends Controller
     public function updateAuthUsername(Request $request): JsonResponse
     {
         $request->validate([
-            'authusername' => 'required|string',
+            'authusername' => 'required|regex:/^\d+$/',
         ]);
 
         $subscriber = $request->user();
@@ -50,11 +51,10 @@ class SubscribersController extends Controller
         if ($existing) {
             $existing->update(['authusername' => $request->authusername]);
         } else {
-            $plainPassword = Str::random(10);
             SubscriberAuthModel::create([
                 'subscriberid' => $subscriber->subscriberid,
                 'authusername' => $request->authusername,
-                'authpassword' => $plainPassword,
+                'authpassword' => '',
                 'status' => 'active'
             ]);
         }
@@ -66,9 +66,10 @@ class SubscribersController extends Controller
     }
 
 
-    public function listAuthUsers(): JsonResponse
+    public function listAuthUsers(Request $request): JsonResponse
     {
-        $auths = SubscriberAuthModel::all();
+        $subscriber = $request->user();
+        $auths = SubscriberAuthModel::where('subscriberid', $subscriber->subscriberid)->get();
         return response()->json(SubscriberAuthResource::collection($auths));
     }
 
@@ -78,11 +79,11 @@ class SubscribersController extends Controller
     public function addAuthUser(Request $request): JsonResponse
     {
         $request->validate([
-            'authusername' => 'required|string|unique:subscriber_auth,authusername',
+            'authusername' => 'required|regex:/^\d+$/|unique:subscriber_auth,authusername',
             'password' => 'nullable|string'
         ]);
 
-        $plainPassword = $request->password ?: Str::random(10);
+        $plainPassword = $request->password ?? '';
         $subscriber = $request->user();
 
         $auth = SubscriberAuthModel::create([
@@ -103,7 +104,7 @@ class SubscribersController extends Controller
     public function addDest(Request $request): JsonResponse
     {
         $request->validate([
-            'authusername' => 'required|string',
+            'authusername' => 'required|regex:/^\d+$/',
             'destination' => 'required|string',
         ]);
 
@@ -132,7 +133,7 @@ class SubscribersController extends Controller
     public function deleteDest(Request $request): JsonResponse
     {
         $request->validate([
-            'authusername' => 'required|string',
+            'authusername' => 'required|regex:/^\d+$/',
             'destination' => 'required|string',
         ]);
 
@@ -163,6 +164,41 @@ class SubscribersController extends Controller
             'status' => true,
             'count' => count($list),
             'destinations' => SubscriberDestResource::collection($list)
+        ]);
+    }
+
+    public function purchaseCredits(Request $request): JsonResponse
+    {
+        $request->validate([
+            'authusername' => 'required|exists:subscriber_auth,authusername',
+            'amount' => 'required|numeric|min:1',
+        ]);
+
+        $subscriber = $request->user();
+        
+        // Ensure the authusername belongs to the current subscriber
+        $auth = SubscriberAuthModel::where('authusername', $request->authusername)
+            ->where('subscriberid', $subscriber->subscriberid)
+            ->first();
+
+        if (!$auth) {
+            return response()->json(['status' => false, 'message' => 'SIP account not found or unauthorized'], 404);
+        }
+
+        $transactionId = 'TXN_' . strtoupper(Str::random(12));
+
+        $credit = PrepaidCredit::create([
+            'authusername' => $request->authusername,
+            'amount' => $request->amount,
+            'transaction_id' => $transactionId,
+            'status' => 'completed'
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Credits purchased successfully',
+            'balance' => $auth->fresh()->balance,
+            'transaction_id' => $transactionId
         ]);
     }
 }

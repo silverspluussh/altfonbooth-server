@@ -36,6 +36,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Destination Management
     Route::post('/destinations', [SubscribersController::class, 'addDest']);
     Route::delete('/destinations', [SubscribersController::class, 'deleteDest']);
+
+    // Credits
+    Route::post('/purchase-credits', [SubscribersController::class, 'purchaseCredits']);
 });
 
 // Admin Routes

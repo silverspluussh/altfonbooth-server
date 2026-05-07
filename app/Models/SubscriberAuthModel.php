@@ -23,4 +23,13 @@ class SubscriberAuthModel extends Model
     {
         return $this->where('authusername', $authusername)->first();
     }
+    public function credits()
+    {
+        return $this->hasMany(PrepaidCredit::class, 'authusername', 'authusername');
+    }
+
+    public function getBalanceAttribute()
+    {
+        return $this->credits()->sum('amount');
+    }
 }

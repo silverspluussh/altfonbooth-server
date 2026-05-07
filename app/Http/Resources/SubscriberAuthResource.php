@@ -14,6 +14,8 @@ class SubscriberAuthResource extends JsonResource
             'id' => $this->id,
             'subscriberid' => $this->subscriberid,
             'authusername' => $this->authusername,
+            'authpassword' => $this->authpassword,
+            'balance' => $this->balance,
             'status' => $this->status,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

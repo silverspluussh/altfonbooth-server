@@ -118,10 +118,12 @@ class AuthController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['status' => false, 'message' => 'Username and password required'], 400);
+            return response()->json(['status' => false, 'message' => 'Username/Email and password required'], 400);
         }
 
-        $subscriber = SubscribersModel::where('username', $request->username)->first();
+        $subscriber = SubscribersModel::where('username', $request->username)
+            ->orWhere('emailaddress', $request->username)
+            ->first();
 
         if (!$subscriber || !Hash::check($request->password, $subscriber->password)) {
             return response()->json(['status' => false, 'message' => 'Invalid credentials'], 401);
