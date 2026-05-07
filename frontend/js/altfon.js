@@ -116,11 +116,17 @@ async function apiRequest(endpoint, options = {}) {
         }
     });
 
+    // Handle rate limiting (429)
+    if (response.status === 429) {
+        throw new Error('Too many requests. Please wait a moment and try again.');
+    }
+
     const data = await response.json();
 
     if (!response.ok) {
         if (response.status === 401) {
-            Auth.logout();
+            // Throw with the exact Laravel message so callers can detect auth failures
+            throw new Error(data.message || 'Unauthenticated.');
         }
         throw new Error(data.message || 'Something went wrong');
     }
