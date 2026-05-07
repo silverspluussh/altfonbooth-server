@@ -17,6 +17,7 @@
       --primary: #010a4c;
       --secondary: #6c757d;
       --success: #28a745;
+      --danger: #ef4444;
       --bg: #f4f7f6;
       --white: #ffffff;
       --sidebar-width: 280px;
@@ -43,24 +44,9 @@
       z-index: 100;
     }
 
-    .sidebar-brand {
-      padding: 0 30px 40px;
-      font-size: 1.8rem;
-      font-weight: 800;
-      letter-spacing: -1px;
-    }
-
-    .sidebar-menu {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      flex-grow: 1;
-    }
-
-    .sidebar-menu li {
-      padding: 5px 20px;
-    }
-
+    .sidebar-brand { padding: 0 30px 40px; font-size: 1.8rem; font-weight: 800; letter-spacing: -1px; }
+    .sidebar-menu { list-style: none; padding: 0; margin: 0; flex-grow: 1; }
+    .sidebar-menu li { padding: 5px 20px; }
     .sidebar-menu a {
       color: rgba(255,255,255,0.7);
       text-decoration: none;
@@ -71,149 +57,57 @@
       font-weight: 600;
       transition: all 0.3s;
     }
-
-    .sidebar-menu a i {
-      margin-right: 15px;
-      width: 20px;
-      text-align: center;
-    }
-
-    .sidebar-menu a:hover, .sidebar-menu a.active {
-      background: rgba(255,255,255,0.1);
-      color: var(--white);
-    }
-
-    .sidebar-footer {
-      padding: 20px 30px;
-      border-top: 1px solid rgba(255,255,255,0.1);
-    }
+    .sidebar-menu a i { margin-right: 15px; width: 20px; text-align: center; }
+    .sidebar-menu a:hover, .sidebar-menu a.active { background: rgba(255,255,255,0.1); color: var(--white); }
+    .sidebar-footer { padding: 20px 30px; border-top: 1px solid rgba(255,255,255,0.1); }
 
     /* Main Content */
-    .main-wrapper {
-      flex-grow: 1;
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-    }
-
+    .main-wrapper { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
     .top-header {
-      background: var(--white);
-      padding: 20px 40px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 2px 15px rgba(0,0,0,0.05);
-      position: sticky;
-      top: 0;
-      z-index: 90;
+      background: var(--white); padding: 20px 40px; display: flex; justify-content: space-between; align-items: center;
+      box-shadow: 0 2px 15px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 90;
     }
-
-    .user-info {
-      display: flex;
-      align-items: center;
-      gap: 15px;
-    }
-
+    .user-info { display: flex; align-items: center; gap: 15px; }
     .user-avatar {
-      width: 40px;
-      height: 40px;
-      background: var(--primary);
-      color: var(--white);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
+      width: 40px; height: 40px; background: var(--primary); color: var(--white); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; font-weight: 800;
     }
-
-    .content-area {
-      padding: 40px;
-      max-width: 1200px;
-      margin: 0 auto;
-      width: 100%;
-      box-sizing: border-box;
-    }
+    .content-area { padding: 40px; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box; }
 
     /* Tabs/Sections */
-    .view-section {
-      display: none;
-    }
-
-    .view-section.active {
-      display: block;
-    }
+    .view-section { display: none; }
+    .view-section.active { display: block; }
 
     /* Stats Grid */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 25px;
-      margin-bottom: 40px;
-    }
-
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 25px; margin-bottom: 40px; }
     .stat-card {
-      background: var(--white);
-      padding: 25px;
-      border-radius: 20px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.02);
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      border: 1px solid rgba(0,0,0,0.03);
+      background: var(--white); padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.02);
+      display: flex; align-items: center; gap: 20px; border: 1px solid rgba(0,0,0,0.03);
     }
-
-    .stat-icon {
-      width: 60px;
-      height: 60px;
-      border-radius: 15px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.5rem;
-    }
-
+    .stat-icon { width: 60px; height: 60px; border-radius: 15px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
     .stat-blue { background: #eef2ff; color: #4338ca; }
     .stat-green { background: #f0fdf4; color: #15803d; }
     .stat-purple { background: #faf5ff; color: #7e22ce; }
-
     .stat-info h3 { margin: 0; font-size: 1.8rem; font-weight: 800; color: var(--primary); }
     .stat-info p { margin: 0; color: var(--secondary); font-size: 0.85rem; font-weight: 600; text-transform: uppercase; }
 
-    /* Tables & Cards */
-    .content-card {
-      background: var(--white);
-      border-radius: 20px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.02);
-      border: 1px solid rgba(0,0,0,0.03);
-      overflow: hidden;
-      margin-bottom: 30px;
-    }
-
-    .card-header {
-      padding: 25px 30px;
-      border-bottom: 1px solid #f1f1f1;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
+    /* Content Card */
+    .content-card { background: var(--white); border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.03); overflow: hidden; margin-bottom: 30px; }
+    .card-header { padding: 25px 30px; border-bottom: 1px solid #f1f1f1; display: flex; justify-content: space-between; align-items: center; }
     .card-header h4 { margin: 0; font-weight: 800; color: var(--primary); }
 
+    /* Buttons */
     .btn-primary { background: var(--primary); color: var(--white); border: none; padding: 12px 24px; border-radius: 12px; cursor: pointer; font-weight: 700; transition: all 0.3s; }
     .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(1, 10, 76, 0.2); }
-    
     .btn-success { background: var(--success); color: var(--white); }
     .btn-success:hover { box-shadow: 0 5px 15px rgba(40, 167, 69, 0.2); }
+    .btn-outline { background: transparent; border: 2px solid #eee; color: var(--primary); padding: 10px 20px; }
+    .btn-outline:hover { border-color: var(--primary); background: #f8f9fa; }
 
-    /* SIP Cards Grid */
-    .sip-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; padding: 30px; }
+    /* SIP Grid */
+    .sip-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 25px; padding: 30px; }
     .sip-card { 
-      background: var(--white); 
-      border: 1px solid #f1f1f1; 
-      border-radius: 18px; 
-      padding: 25px; 
-      transition: all 0.3s; 
-      position: relative;
+      background: var(--white); border: 1px solid #f1f1f1; border-radius: 18px; padding: 25px; transition: all 0.3s; position: relative;
       box-shadow: 0 5px 15px rgba(0,0,0,0.02);
     }
     .sip-card:hover { transform: translateY(-5px); box-shadow: 0 15px 35px rgba(0,0,0,0.08); border-color: var(--primary); }
@@ -221,20 +115,22 @@
     .sip-card .sip-label { font-size: 0.75rem; color: var(--secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
     .sip-card .sip-balance { font-size: 2.2rem; font-weight: 900; color: var(--success); margin: 20px 0; }
     
-    /* Table Styling */
+    /* Data Table */
     .data-table { width: 100%; border-collapse: collapse; }
     .data-table th, .data-table td { padding: 20px 30px; text-align: left; border-bottom: 1px solid #f1f1f1; }
     .data-table th { background: #fafafa; color: var(--secondary); font-size: 0.8rem; text-transform: uppercase; font-weight: 700; }
     .badge { padding: 6px 14px; border-radius: 20px; font-weight: 800; font-size: 0.7rem; text-transform: uppercase; }
     .badge-success { background: #e7f5ea; color: #15803d; }
     
-    /* Modal Styling */
+    /* Modal */
     .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(1, 10, 76, 0.6); z-index:1000; align-items:center; justify-content:center; backdrop-filter: blur(8px); }
     .modal-content { background: var(--white); padding: 40px; border-radius: 24px; width: 90%; max-width: 480px; box-shadow: 0 25px 50px rgba(0,0,0,0.2); }
     .form-group { margin-bottom: 20px; }
     .form-group label { font-weight: 700; color: var(--primary); display: block; margin-bottom: 8px; }
-    .form-control { width: 100%; padding: 15px; border: 2px solid #eee; border-radius: 12px; font-size: 1rem; transition: all 0.3s; box-sizing: border-box; }
+    .form-control { width: 100%; padding: 15px; border: 2px solid #eee; border-radius: 12px; font-size: 1rem; transition: all 0.3s; box-sizing: border-box; color: var(--primary); }
     .form-control:focus { border-color: var(--primary); outline: none; }
+    select.form-control { background-color: var(--white); color: var(--primary); }
+    select.form-control option { color: var(--primary); background-color: var(--white); }
 
     @media (max-width: 992px) {
       .sidebar { width: 80px; }
@@ -250,36 +146,23 @@
   <!-- Sidebar -->
   <aside class="sidebar">
     <div class="sidebar-brand">
-      Altfon<span>.</span>
+      <a href="index" style="color: inherit; text-decoration: none;">Altfon<span>.</span></a>
     </div>
     <ul class="sidebar-menu">
-      <li>
-        <a href="#" class="active" onclick="showSection('overview', this)">
-          <i class="fa fa-th-large"></i> <span>Overview</span>
-        </a>
-      </li>
-      <li>
-        <a href="#" onclick="showSection('sip-accounts', this)">
-          <i class="fa fa-phone"></i> <span>SIP Accounts</span>
-        </a>
-      </li>
-      <li>
-        <a href="#" onclick="showSection('destinations', this)">
-          <i class="fa fa-map-marker"></i> <span>Destinations</span>
-        </a>
-      </li>
+      <li><a href="#" class="active" onclick="showSection('overview', this)"><i class="fa fa-th-large"></i> <span>Overview</span></a></li>
+      <li><a href="#" onclick="showSection('sip-accounts', this)"><i class="fa fa-phone"></i> <span>SIP Accounts</span></a></li>
+      <li><a href="#" onclick="showSection('destinations', this)"><i class="fa fa-map-marker"></i> <span>Destinations</span></a></li>
+      <li><a href="#" onclick="showSection('settings', this)"><i class="fa fa-cog"></i> <span>Settings</span></a></li>
     </ul>
     <div class="sidebar-footer">
-      <a href="javascript:Auth.logout()" style="color: rgba(255,255,255,0.6); text-decoration: none; font-weight: 700;">
-        <i class="fa fa-sign-out"></i> <span>Logout</span>
-      </a>
+      <a href="javascript:Auth.logout()" style="color: rgba(255,255,255,0.6); text-decoration: none; font-weight: 700;"><i class="fa fa-sign-out"></i> <span>Logout</span></a>
     </div>
   </aside>
 
   <!-- Main Content -->
   <div class="main-wrapper">
     <header class="top-header">
-      <h2 id="sectionTitle" style="margin:0; font-weight: 800; color: var(--primary);">Dashboard</h2>
+      <h2 id="sectionTitle" style="margin:0; font-weight: 800; color: var(--primary);">Overview</h2>
       <div class="user-info">
         <div id="userName" style="font-weight: 700; color: var(--primary);">Loading...</div>
         <div class="user-avatar" id="userInitial">U</div>
@@ -293,34 +176,20 @@
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-icon stat-blue"><i class="fa fa-user"></i></div>
-            <div class="stat-info">
-              <p>Primary Account</p>
-              <h3 id="primarySIP">...</h3>
-            </div>
+            <div class="stat-info"><p>Primary SIP</p><h3 id="primarySIP">...</h3></div>
           </div>
           <div class="stat-card">
             <div class="stat-icon stat-green"><i class="fa fa-money"></i></div>
-            <div class="stat-info">
-              <p>Total Balance</p>
-              <h3 id="totalBalance">$0.00</h3>
-            </div>
+            <div class="stat-info"><p>Total Balance</p><h3 id="totalBalance">$0.00</h3></div>
           </div>
           <div class="stat-card">
             <div class="stat-icon stat-purple"><i class="fa fa-link"></i></div>
-            <div class="stat-info">
-              <p>Destinations</p>
-              <h3 id="totalDest">0</h3>
-            </div>
+            <div class="stat-info"><p>Destinations</p><h3 id="totalDest">0</h3></div>
           </div>
         </div>
-
         <div class="content-card">
-          <div class="card-header">
-            <h4>Quick Stats</h4>
-          </div>
-          <div style="padding: 30px;">
-            <p>Welcome to your Altfon Booth dashboard. From here you can manage your SIP accounts, buy prepaid credits, and route your calls to specific destinations.</p>
-          </div>
+          <div class="card-header"><h4>Quick Summary</h4></div>
+          <div style="padding: 30px;"><p>Manage your VOIP services efficiently. Switch tabs in the sidebar to add accounts or link destinations.</p></div>
         </div>
       </section>
 
@@ -334,33 +203,34 @@
               <button class="btn-primary" onclick="openModal('addAuthModal')">+ New Account</button>
             </div>
           </div>
-          <div id="authGrid" class="sip-grid">
-            <!-- Dynamic Cards -->
-          </div>
+          <div id="authGrid" class="sip-grid"></div>
         </div>
       </section>
 
       <!-- Section: Destinations -->
       <section id="destinations" class="view-section animated fadeIn">
         <div class="content-card">
-          <div class="card-header">
-            <h4>Manage Destinations</h4>
-            <button class="btn-primary" onclick="openModal('addDestModal')">+ Add Destination</button>
-          </div>
+          <div class="card-header"><h4>Manage Destinations</h4><button class="btn-primary" onclick="openModal('addDestModal')">+ Add Destination</button></div>
           <div style="overflow-x: auto;">
             <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Linked SIP Account</th>
-                  <th>Destination Number</th>
-                  <th>Status</th>
-                  <th style="text-align: right;">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="destTableBody">
-                <!-- Dynamic Rows -->
-              </tbody>
+              <thead><tr><th>SIP Account</th><th>Destination</th><th>Status</th><th style="text-align: right;">Actions</th></tr></thead>
+              <tbody id="destTableBody"></tbody>
             </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Settings -->
+      <section id="settings" class="view-section animated fadeIn">
+        <div class="content-card">
+          <div class="card-header"><h4>Account Settings</h4></div>
+          <div style="padding: 40px; max-width: 600px;">
+            <form id="profileForm">
+              <div class="form-group"><label>Full Name</label><input type="text" id="settingsFullname" class="form-control" required></div>
+              <div class="form-group"><label>Email Address</label><input type="email" id="settingsEmail" class="form-control" required></div>
+              <div class="form-group"><label>Change Password (Leave blank to keep current)</label><input type="password" id="settingsPassword" class="form-control" placeholder="New Password"></div>
+              <button type="submit" class="btn-primary" style="margin-top: 20px; width: 100%;">UPDATE PROFILE</button>
+            </form>
           </div>
         </div>
       </section>
@@ -369,71 +239,42 @@
   </div>
 
   <!-- Modals -->
-  <!-- Add Auth Modal -->
-  <div id="addAuthModal" class="modal">
-    <div class="modal-content">
-      <h3 style="margin-top:0; color: var(--primary);">Add SIP Account</h3>
-      <p style="color: var(--secondary); margin-bottom: 25px;">Create a new VoIP authentication account.</p>
-      <form id="addAuthForm">
-        <div class="form-group">
-          <label>Auth Username (Digits Only)</label>
-          <input type="text" id="newAuthUsername" class="form-control" placeholder="e.g. 1001" required pattern="\d+">
-        </div>
-        <div class="form-group">
-          <label>Auth Password (Optional)</label>
-          <input type="password" id="newAuthPassword" class="form-control" placeholder="Leave blank for auto-gen">
-        </div>
-        <div style="display: flex; gap: 15px; margin-top: 30px;">
-          <button type="button" class="btn-primary" style="background: #eee; color: #555; flex: 1;" onclick="closeModal('addAuthModal')">Cancel</button>
-          <button type="submit" class="btn-primary" style="flex: 1;">Create Account</button>
-        </div>
-      </form>
-    </div>
-  </div>
+  <div id="addAuthModal" class="modal"><div class="modal-content">
+    <h3 style="margin-top:0;">Add SIP Account</h3><p style="color: var(--secondary);">Create a new VoIP account.</p>
+    <form id="addAuthForm">
+      <div class="form-group"><label>Auth Username (Digits)</label><input type="text" id="newAuthUsername" class="form-control" required pattern="\d+"></div>
+      <div class="form-group"><label>Auth Password (Optional)</label><input type="password" id="newAuthPassword" class="form-control"></div>
+      <div style="display: flex; gap: 15px; margin-top: 30px;"><button type="button" class="btn-primary" style="background:#eee; color:#555; flex:1;" onclick="closeModal('addAuthModal')">Cancel</button><button type="submit" class="btn-primary" style="flex:1;">Create</button></div>
+    </form>
+  </div></div>
 
-  <!-- Buy Credits Modal -->
-  <div id="buyCreditsModal" class="modal">
-    <div class="modal-content">
-      <h3 style="margin-top:0; color: var(--primary);">Buy Prepaid Credits</h3>
-      <p style="color: var(--secondary); margin-bottom: 25px;">Select an account and top up your balance.</p>
-      <form id="buyCreditsForm">
-        <div class="form-group">
-          <label>Select SIP Account</label>
-          <select id="buyAuthSelect" class="form-control" required></select>
-        </div>
-        <div class="form-group">
-          <label>Amount (USD)</label>
-          <input type="number" id="creditAmount" class="form-control" placeholder="e.g. 50" min="1" required>
-        </div>
-        <div style="display: flex; gap: 15px; margin-top: 30px;">
-          <button type="button" class="btn-primary" style="background: #eee; color: #555; flex: 1;" onclick="closeModal('buyCreditsModal')">Cancel</button>
-          <button type="submit" class="btn-primary btn-success" style="flex: 1;">Purchase Now</button>
-        </div>
-      </form>
-    </div>
-  </div>
+  <div id="updateAuthModal" class="modal"><div class="modal-content">
+    <h3 style="margin-top:0;">Update SIP Account</h3><p style="color: var(--secondary);">Modify account credentials.</p>
+    <form id="updateAuthForm">
+      <input type="hidden" id="editAuthId">
+      <div class="form-group"><label>Auth Username (Digits)</label><input type="text" id="editAuthUsername" class="form-control" required pattern="\d+"></div>
+      <div class="form-group"><label>Auth Password</label><input type="text" id="editAuthPassword" class="form-control"></div>
+      <div style="display: flex; gap: 15px; margin-top: 30px;"><button type="button" class="btn-primary" style="background:#eee; color:#555; flex:1;" onclick="closeModal('updateAuthModal')">Cancel</button><button type="submit" class="btn-primary" style="flex:1;">Save Changes</button></div>
+    </form>
+  </div></div>
 
-  <!-- Add Dest Modal -->
-  <div id="addDestModal" class="modal">
-    <div class="modal-content">
-      <h3 style="margin-top:0; color: var(--primary);">Add Destination</h3>
-      <p style="color: var(--secondary); margin-bottom: 25px;">Link a phone number to a SIP account.</p>
-      <form id="addDestForm">
-        <div class="form-group">
-          <label>Select SIP Account</label>
-          <select id="authSelect" class="form-control" required></select>
-        </div>
-        <div class="form-group">
-          <label>Destination Number</label>
-          <input type="text" id="destinationNumber" class="form-control" placeholder="e.g. 233240000000" required>
-        </div>
-        <div style="display: flex; gap: 15px; margin-top: 30px;">
-          <button type="button" class="btn-primary" style="background: #eee; color: #555; flex: 1;" onclick="closeModal('addDestModal')">Cancel</button>
-          <button type="submit" class="btn-primary" style="flex: 1;">Save Destination</button>
-        </div>
-      </form>
-    </div>
-  </div>
+  <div id="buyCreditsModal" class="modal"><div class="modal-content">
+    <h3>Buy Credits</h3><p>Top up your SIP account balance.</p>
+    <form id="buyCreditsForm">
+      <div class="form-group"><label>Account</label><select id="buyAuthSelect" class="form-control" required></select></div>
+      <div class="form-group"><label>Amount (USD)</label><input type="number" id="creditAmount" class="form-control" min="1" required></div>
+      <div style="display: flex; gap: 15px; margin-top: 30px;"><button type="button" class="btn-primary" style="background:#eee; color:#555; flex:1;" onclick="closeModal('buyCreditsModal')">Cancel</button><button type="submit" class="btn-primary btn-success" style="flex:1;">Buy Now</button></div>
+    </form>
+  </div></div>
+
+  <div id="addDestModal" class="modal"><div class="modal-content">
+    <h3>Add Destination</h3><p>Link a number to a SIP account.</p>
+    <form id="addDestForm">
+      <div class="form-group"><label>Account</label><select id="authSelect" class="form-control" required></select></div>
+      <div class="form-group"><label>Number</label><input type="text" id="destinationNumber" class="form-control" required></div>
+      <div style="display: flex; gap: 15px; margin-top: 30px;"><button type="button" class="btn-primary" style="background:#eee; color:#555; flex:1;" onclick="closeModal('addDestModal')">Cancel</button><button type="submit" class="btn-primary" style="flex:1;">Save</button></div>
+    </form>
+  </div></div>
 
   <script src="js/jquery.js"></script>
   <script src="js/altfon.js"></script>
@@ -441,18 +282,14 @@
     let currentUser = null;
     let authAccounts = [];
 
-    // SPA Navigation
     function showSection(id, el) {
       document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
       document.getElementById(id).classList.add('active');
-      
       document.querySelectorAll('.sidebar-menu a').forEach(a => a.classList.remove('active'));
       el.classList.add('active');
-
       document.getElementById('sectionTitle').innerText = el.querySelector('span').innerText;
     }
 
-    // Modal Helpers
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
@@ -466,7 +303,10 @@
         document.getElementById('userInitial').innerText = (currentUser.fullname || 'U')[0].toUpperCase();
         document.getElementById('primarySIP').innerText = currentUser.authusername || 'Not Set';
         
-        // Data Load
+        // Populate Settings
+        document.getElementById('settingsFullname').value = currentUser.fullname;
+        document.getElementById('settingsEmail').value = currentUser.emailaddress;
+        
         const authResponse = await apiRequest('/auth-users');
         authAccounts = authResponse.data || authResponse || [];
         renderAuthAccounts(authAccounts);
@@ -475,36 +315,39 @@
         const destData = await apiRequest('/my-destinations');
         renderDestinations(destData.destinations || []);
         
-        // Summary Stats
         document.getElementById('totalDest').innerText = destData.count || 0;
         const totalBal = authAccounts.reduce((acc, curr) => acc + parseFloat(curr.balance || 0), 0);
         document.getElementById('totalBalance').innerText = `$${totalBal.toFixed(2)}`;
-
       } catch (error) { 
-        console.error(error);
-        UI.showToast('Session error, please login again', 'error');
+        console.error(error); UI.showToast('Session error', 'error');
         setTimeout(() => Auth.logout(), 2000);
       }
     }
 
     function renderAuthAccounts(list) {
       const grid = document.getElementById('authGrid');
-      grid.innerHTML = list.length === 0 ? '<p style="padding: 20px; color: #6c757d;">No SIP accounts found.</p>' : '';
+      grid.innerHTML = list.length === 0 ? '<p style="padding: 20px;">No accounts found.</p>' : '';
       list.forEach(item => {
         const card = document.createElement('div');
         card.className = 'sip-card';
         card.innerHTML = `
           <div style="position: absolute; top: 20px; right: 20px;"><span class="badge badge-success">${item.status}</span></div>
-          <div class="sip-label">SIP Number</div>
-          <div class="sip-number">${item.authusername}</div>
-          <div class="sip-label" style="margin-top: 15px;">Account Balance</div>
-          <div class="sip-balance">$${parseFloat(item.balance || 0).toFixed(2)}</div>
-          <button class="btn-primary btn-success" style="width: 100%;" onclick="openPurchase('${item.authusername}')">
-            <i class="fa fa-money"></i> BUY CREDITS
-          </button>
+          <div class="sip-label">SIP Number</div><div class="sip-number">${item.authusername}</div>
+          <div class="sip-label" style="margin-top: 15px;">Balance</div><div class="sip-balance">$${parseFloat(item.balance || 0).toFixed(2)}</div>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn-primary btn-success btn-small" style="flex:1;" onclick="openPurchase('${item.authusername}')"><i class="fa fa-money"></i> BUY</button>
+            <button class="btn-primary btn-outline btn-small" style="flex:1;" onclick="openEditAuth(${JSON.stringify(item).replace(/"/g, '&quot;')})"><i class="fa fa-edit"></i> EDIT</button>
+          </div>
         `;
         grid.appendChild(card);
       });
+    }
+
+    function openEditAuth(item) {
+        document.getElementById('editAuthId').value = item.id;
+        document.getElementById('editAuthUsername').value = item.authusername;
+        document.getElementById('editAuthPassword').value = item.authpassword || '';
+        openModal('updateAuthModal');
     }
 
     function openPurchase(username) {
@@ -515,7 +358,7 @@
     function populateSelects(list) {
       ['authSelect', 'buyAuthSelect'].forEach(id => {
         const select = document.getElementById(id);
-        select.innerHTML = '<option value="">-- Select Account --</option>';
+        select.innerHTML = '<option value="">-- Select --</option>';
         list.forEach(item => {
           const opt = document.createElement('option');
           opt.value = item.authusername; opt.innerText = item.authusername;
@@ -526,41 +369,69 @@
 
     function renderDestinations(list) {
       const tbody = document.getElementById('destTableBody');
-      tbody.innerHTML = list.length === 0 ? '<tr><td colspan="4" style="text-align: center; padding: 40px; color: #6c757d;">No destinations found.</td></tr>' : '';
+      tbody.innerHTML = list.length === 0 ? '<tr><td colspan="4" style="text-align: center; padding: 40px;">No destinations.</td></tr>' : '';
       list.forEach(item => {
         const row = document.createElement('tr');
         row.innerHTML = `
-          <td style="font-weight: 700; color: var(--primary);">${item.authusername}</td>
-          <td style="font-family: monospace; font-weight: 600;">${item.destination}</td>
+          <td style="font-weight: 700;">${item.authusername}</td>
+          <td style="font-family: monospace;">${item.destination}</td>
           <td><span class="badge badge-success">${item.status}</span></td>
-          <td style="text-align: right;">
-            <button onclick="deleteDest('${item.authusername}', '${item.destination}')" style="background: none; border: none; color: #ef4444; font-weight: 800; cursor: pointer;">
-              <i class="fa fa-trash"></i> DELETE
-            </button>
-          </td>
+          <td style="text-align: right;"><button onclick="deleteDest('${item.authusername}', '${item.destination}')" style="background:none; border:none; color:#ef4444; font-weight:800; cursor:pointer;"><i class="fa fa-trash"></i></button></td>
         `;
         tbody.appendChild(row);
       });
     }
 
-    // Form Handlers
+    // Forms
+    document.getElementById('profileForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button');
+        try {
+            btn.disabled = true; btn.innerText = 'UPDATING...';
+            const res = await apiRequest('/update-profile', {
+                method: 'POST',
+                body: JSON.stringify({
+                    fullname: document.getElementById('settingsFullname').value,
+                    emailaddress: document.getElementById('settingsEmail').value,
+                    password: document.getElementById('settingsPassword').value
+                })
+            });
+            UI.showToast('Profile updated!');
+            document.getElementById('settingsPassword').value = '';
+            init();
+        } catch (error) { UI.showToast(error.message, 'error'); }
+        finally { btn.disabled = false; btn.innerText = 'UPDATE PROFILE'; }
+    });
+
+    document.getElementById('updateAuthForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button[type="submit"]');
+        try {
+            btn.disabled = true; btn.innerText = 'SAVING...';
+            await apiRequest('/update-auth-account', {
+                method: 'POST',
+                body: JSON.stringify({
+                    id: document.getElementById('editAuthId').value,
+                    authusername: document.getElementById('editAuthUsername').value,
+                    authpassword: document.getElementById('editAuthPassword').value
+                })
+            });
+            UI.showToast('SIP Account updated!');
+            closeModal('updateAuthModal');
+            init();
+        } catch (error) { UI.showToast(error.message, 'error'); }
+        finally { btn.disabled = false; btn.innerText = 'SAVE CHANGES'; }
+    });
+
     document.getElementById('addAuthForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = e.target.querySelector('button[type="submit"]');
       try {
         btn.disabled = true; btn.innerText = 'Creating...';
-        await apiRequest('/auth-users', {
-          method: 'POST',
-          body: JSON.stringify({
-            authusername: document.getElementById('newAuthUsername').value,
-            password: document.getElementById('newAuthPassword').value
-          })
-        });
-        UI.showToast('SIP Account created!');
-        closeModal('addAuthModal');
-        e.target.reset(); init();
+        await apiRequest('/auth-users', { method: 'POST', body: JSON.stringify({ authusername: document.getElementById('newAuthUsername').value, password: document.getElementById('newAuthPassword').value }) });
+        UI.showToast('SIP Account created!'); closeModal('addAuthModal'); e.target.reset(); init();
       } catch (error) { UI.showToast(error.message, 'error'); }
-      finally { btn.disabled = false; btn.innerText = 'Create Account'; }
+      finally { btn.disabled = false; btn.innerText = 'Create'; }
     });
 
     document.getElementById('addDestForm').addEventListener('submit', async (e) => {
@@ -568,18 +439,10 @@
       const btn = e.target.querySelector('button[type="submit"]');
       try {
         btn.disabled = true; btn.innerText = 'Saving...';
-        await apiRequest('/destinations', {
-          method: 'POST',
-          body: JSON.stringify({ 
-            authusername: document.getElementById('authSelect').value, 
-            destination: document.getElementById('destinationNumber').value 
-          })
-        });
-        UI.showToast('Destination added!');
-        closeModal('addDestModal');
-        e.target.reset(); init();
+        await apiRequest('/destinations', { method: 'POST', body: JSON.stringify({ authusername: document.getElementById('authSelect').value, destination: document.getElementById('destinationNumber').value }) });
+        UI.showToast('Destination added!'); closeModal('addDestModal'); e.target.reset(); init();
       } catch (error) { UI.showToast(error.message, 'error'); }
-      finally { btn.disabled = false; btn.innerText = 'Save Destination'; }
+      finally { btn.disabled = false; btn.innerText = 'Save'; }
     });
 
     document.getElementById('buyCreditsForm').addEventListener('submit', async (e) => {
@@ -587,36 +450,18 @@
       const btn = e.target.querySelector('button[type="submit"]');
       try {
         btn.disabled = true; btn.innerText = 'Processing...';
-        await apiRequest('/purchase-credits', {
-          method: 'POST',
-          body: JSON.stringify({ 
-            authusername: document.getElementById('buyAuthSelect').value, 
-            amount: document.getElementById('creditAmount').value 
-          })
-        });
-        UI.showToast('Credits added successfully!');
-        closeModal('buyCreditsModal');
-        e.target.reset(); init();
+        await apiRequest('/purchase-credits', { method: 'POST', body: JSON.stringify({ authusername: document.getElementById('buyAuthSelect').value, amount: document.getElementById('creditAmount').value }) });
+        UI.showToast('Credits added!'); closeModal('buyCreditsModal'); e.target.reset(); init();
       } catch (error) { UI.showToast(error.message, 'error'); }
-      finally { btn.disabled = false; btn.innerText = 'Purchase Now'; }
+      finally { btn.disabled = false; btn.innerText = 'Buy Now'; }
     });
 
     async function deleteDest(authUser, dest) {
       if (!confirm(`Delete destination ${dest}?`)) return;
-      try {
-        await apiRequest('/destinations', { 
-          method: 'DELETE', 
-          body: JSON.stringify({ authusername: authUser, destination: dest }) 
-        });
-        UI.showToast('Deleted'); init();
-      } catch (error) { UI.showToast(error.message, 'error'); }
+      try { await apiRequest('/destinations', { method: 'DELETE', body: JSON.stringify({ authusername: authUser, destination: dest }) }); UI.showToast('Deleted'); init(); } catch (error) { UI.showToast(error.message, 'error'); }
     }
 
-    // Close Modals on Backdrop Click
-    window.onclick = function(e) {
-      if (e.target.classList.contains('modal')) closeModal(e.target.id);
-    }
-
+    window.onclick = function(e) { if (e.target.classList.contains('modal')) closeModal(e.target.id); }
     init();
   </script>
 </body>

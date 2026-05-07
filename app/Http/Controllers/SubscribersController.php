@@ -65,6 +65,67 @@ class SubscribersController extends Controller
         ]);
     }
 
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $subscriber = $request->user();
+        
+        $request->validate([
+            'fullname' => 'sometimes|string|max:255',
+            'emailaddress' => 'sometimes|email|unique:subscribers,emailaddress,' . $subscriber->subscriberid . ',subscriberid',
+            'password' => 'sometimes|nullable|string|min:6'
+        ]);
+
+        $data = $request->only(['fullname', 'emailaddress']);
+        if ($request->filled('password')) {
+            $data['password'] = Hash::make($request->password);
+        }
+
+        $subscriber->update($data);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Profile updated successfully',
+            'user' => new SubscriberResource($subscriber)
+        ]);
+    }
+
+    public function updateAuthAccount(Request $request): JsonResponse
+    {
+        $request->validate([
+            'id' => 'required|exists:subscriber_auth,id',
+            'authusername' => 'required|regex:/^\d+$/',
+            'authpassword' => 'nullable|string'
+        ]);
+
+        $subscriber = $request->user();
+        $auth = SubscriberAuthModel::where('id', $request->id)
+            ->where('subscriberid', $subscriber->subscriberid)
+            ->first();
+
+        if (!$auth) {
+            return response()->json(['status' => false, 'message' => 'SIP account not found or unauthorized'], 404);
+        }
+
+        // Check if new authusername is taken by someone else
+        $taken = SubscriberAuthModel::where('authusername', $request->authusername)
+            ->where('id', '!=', $request->id)
+            ->exists();
+        
+        if ($taken) {
+            return response()->json(['status' => false, 'message' => 'This SIP Number is already taken'], 422);
+        }
+
+        $auth->update([
+            'authusername' => $request->authusername,
+            'authpassword' => $request->authpassword ?? ''
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'SIP Account updated successfully'
+        ]);
+    }
+
 
     public function listAuthUsers(Request $request): JsonResponse
     {

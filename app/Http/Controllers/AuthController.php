@@ -121,9 +121,11 @@ class AuthController extends Controller
             return response()->json(['status' => false, 'message' => 'Username/Email and password required'], 400);
         }
 
-        $subscriber = SubscribersModel::where('username', $request->username)
-            ->orWhere('emailaddress', $request->username)
-            ->first();
+        $identifier = trim($request->username);
+        $subscriber = SubscribersModel::where(function($query) use ($identifier) {
+            $query->where('username', $identifier)
+                  ->orWhere('emailaddress', $identifier);
+        })->first();
 
         if (!$subscriber || !Hash::check($request->password, $subscriber->password)) {
             return response()->json(['status' => false, 'message' => 'Invalid credentials'], 401);

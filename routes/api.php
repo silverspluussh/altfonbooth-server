@@ -39,6 +39,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Credits
     Route::post('/purchase-credits', [SubscribersController::class, 'purchaseCredits']);
+
+    // Settings & Updates
+    Route::post('/update-profile', [SubscribersController::class, 'updateProfile']);
+    Route::post('/update-auth-account', [SubscribersController::class, 'updateAuthAccount']);
 });
 
 // Admin Routes
