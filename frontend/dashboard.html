@@ -406,12 +406,22 @@
   <!-- Modals -->
   <!-- Modals remain the same structure but styled for the new look -->
   <div id="addAuthModal" class="modal"><div class="modal-content">
-    <h3 style="margin-top:0;">Add SIP Account</h3><p style="color: var(--secondary); font-size: 0.9rem;">Create a new VoIP authentication account.</p>
+    <h3 style="margin-top:0;">Add SIP Account</h3><p style="color: var(--secondary); font-size: 0.9rem;">A unique 6-digit SIP number and password will be auto-generated for you.</p>
     <form id="addAuthForm">
-      <div class="form-group"><label>Auth Username (Digits Only)</label><input type="text" id="newAuthUsername" class="form-control" required pattern="\d+"></div>
-      <div class="form-group"><label>Auth Password (Optional)</label><input type="password" id="newAuthPassword" class="form-control" placeholder="Optional"></div>
-      <div style="display: flex; gap: 12px; margin-top: 25px;"><button type="button" class="btn btn-md btn-outline" style="flex:1;" onclick="closeModal('addAuthModal')">Cancel</button><button type="submit" class="btn btn-md btn-primary" style="flex:1;">Create Account</button></div>
+      <div style="display: flex; gap: 12px; margin-top: 25px;"><button type="button" class="btn btn-md btn-outline" style="flex:1;" onclick="closeModal('addAuthModal')">Cancel</button><button type="submit" class="btn btn-md btn-primary" style="flex:1;">Generate Account</button></div>
     </form>
+  </div></div>
+
+  <!-- Modal to display newly created credentials -->
+  <div id="credentialsModal" class="modal"><div class="modal-content" style="text-align: center;">
+    <div style="font-size: 3rem; color: var(--success); margin-bottom: 15px;"><i class="fa fa-check-circle"></i></div>
+    <h3 style="margin-top:0; font-weight: 800; color: var(--primary);">SIP Account Created!</h3>
+    <p style="color: var(--secondary); font-size: 0.9rem; margin-bottom: 25px;">Save these credentials — the password will not be shown again.</p>
+    <div style="background: var(--bg); border-radius: 12px; padding: 20px; text-align: left; margin-bottom: 20px;">
+      <div style="margin-bottom: 12px;"><span style="font-size: 0.8rem; color: var(--secondary); text-transform: uppercase; letter-spacing: 1px;">SIP Number</span><div id="genAuthUsername" style="font-size: 1.4rem; font-weight: 800; font-family: monospace; color: var(--primary);"></div></div>
+      <div><span style="font-size: 0.8rem; color: var(--secondary); text-transform: uppercase; letter-spacing: 1px;">Password</span><div id="genAuthPassword" style="font-size: 1.4rem; font-weight: 800; font-family: monospace; color: var(--primary);"></div></div>
+    </div>
+    <button class="btn btn-md btn-primary" style="width: 100%;" onclick="closeModal('credentialsModal')">Done</button>
   </div></div>
 
   <div id="updateAuthModal" class="modal"><div class="modal-content">
@@ -462,6 +472,7 @@
   <script>
     let currentUser = null;
     let authAccounts = [];
+    let paystackPublicKey = null;
 
     // Profile Dropdown Toggle
     document.getElementById('profileTrigger').addEventListener('click', function(e) {
@@ -492,12 +503,11 @@
         
         history.forEach(item => {
           const row = document.createElement('tr');
-          const date = new Date(item.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
           row.innerHTML = `
-            <td style="padding: 12px 15px;">${date}</td>
-            <td style="padding: 12px 15px; font-family: monospace;">${item.authusername}</td>
-            <td style="padding: 12px 15px; font-weight: 700; color: var(--primary);">$${parseFloat(item.amount).toFixed(2)}</td>
-            <td style="padding: 12px 15px;"><span class="badge badge-success">${item.status}</span></td>
+            <td style="padding: 12px 15px;">${new Date(item.created_at).toLocaleDateString()}</td>
+            <td style="padding: 12px 15px; font-weight: 600;">${UI.esc(item.authusername)}</td>
+            <td style="padding: 12px 15px; font-weight: 700; color: var(--success);">$${parseFloat(item.amount).toFixed(2)}</td>
+            <td style="padding: 12px 15px;"><span class="badge badge-success">${UI.esc(item.status)}</span></td>
           `;
           tbody.appendChild(row);
         });
@@ -571,6 +581,10 @@
         document.getElementById('totalDest').innerText = destData.count || 0;
         const totalBal = authAccounts.reduce((acc, curr) => acc + parseFloat(curr.balance || 0), 0);
         document.getElementById('totalBalance').innerText = `$${totalBal.toFixed(2)}`;
+
+        // Fetch Payment Config
+        const configRes = await apiRequest('/payments/config');
+        paystackPublicKey = configRes.paystack_public_key;
       } catch (error) { 
         console.error(error); UI.showToast('Session error', 'error');
         setTimeout(() => Auth.logout(), 2000);
@@ -587,14 +601,14 @@
           <div style="display: flex; justify-content: space-between; align-items: flex-start;">
             <div>
               <div class="sip-label">SIP NUMBER</div>
-              <div class="sip-number">${item.authusername}</div>
+              <div class="sip-number">${UI.esc(item.authusername)}</div>
             </div>
-            <span class="badge badge-success">${item.status}</span>
+            <span class="badge badge-success">${UI.esc(item.status)}</span>
           </div>
           <div class="sip-label" style="margin-top: 15px;">AVAILABLE BALANCE</div>
           <div class="sip-balance">$${parseFloat(item.balance || 0).toFixed(2)}</div>
           <div class="sip-actions">
-            <button class="btn btn-sm btn-success" style="flex:1;" onclick="openPurchase('${item.authusername}')"><i class="fa fa-money"></i> BUY</button>
+            <button class="btn btn-sm btn-success" style="flex:1;" onclick="openPurchase('${UI.esc(item.authusername)}')"><i class="fa fa-money"></i> BUY</button>
             <button class="btn btn-sm btn-outline" style="flex:1;" onclick="openEditAuth(${JSON.stringify(item).replace(/"/g, '&quot;')})"><i class="fa fa-edit"></i> EDIT</button>
           </div>
         `;
@@ -644,10 +658,10 @@
       list.forEach(item => {
         const row = document.createElement('tr');
         row.innerHTML = `
-          <td style="font-weight: 700; color: var(--primary);">${item.authusername}</td>
-          <td style="font-family: monospace; font-weight: 600;">${item.destination}</td>
+          <td style="font-weight: 700; color: var(--primary);">${UI.esc(item.authusername)}</td>
+          <td style="font-family: monospace; font-weight: 600;">${UI.esc(item.destination)}</td>
           <td style="text-align: right;">
-            <button onclick="deleteDest('${item.authusername}', '${item.destination}')" style="background:none; border:none; color:var(--danger); font-size: 1rem; cursor:pointer;">
+            <button onclick="deleteDest('${UI.esc(item.authusername)}', '${UI.esc(item.destination)}')" style="background:none; border:none; color:var(--danger); font-size: 1rem; cursor:pointer;">
               <i class="fa fa-trash"></i>
             </button>
           </td>
@@ -702,11 +716,16 @@
       e.preventDefault();
       const btn = e.target.querySelector('button[type="submit"]');
       try {
-        btn.disabled = true; btn.innerText = 'CREATING...';
-        await apiRequest('/auth-users', { method: 'POST', body: JSON.stringify({ authusername: document.getElementById('newAuthUsername').value, password: document.getElementById('newAuthPassword').value }) });
-        UI.showToast('SIP Account created!'); closeModal('addAuthModal'); e.target.reset(); init();
+        btn.disabled = true; btn.innerText = 'GENERATING...';
+        const res = await apiRequest('/auth-users', { method: 'POST', body: JSON.stringify({}) });
+        closeModal('addAuthModal');
+        // Show the generated credentials
+        document.getElementById('genAuthUsername').innerText = res.authusername;
+        document.getElementById('genAuthPassword').innerText = res.authpassword;
+        openModal('credentialsModal');
+        init();
       } catch (error) { UI.showToast(error.message, 'error'); }
-      finally { btn.disabled = false; btn.innerText = 'CREATE ACCOUNT'; }
+      finally { btn.disabled = false; btn.innerText = 'GENERATE ACCOUNT'; }
     });
 
     document.getElementById('addDestForm').addEventListener('submit', async (e) => {
@@ -741,7 +760,7 @@
         if (!res.status) throw new Error(res.message);
 
         const handler = PaystackPop.setup({
-          key: 'sk_test_17a973bf685ec84f3ea2555259d4a1d550f0eb1c', // IMPORTANT: USE PUBLIC KEY (pk_...) NOT SECRET KEY (sk_...)
+          key: paystackPublicKey,
           access_code: res.data.access_code,
           onClose: () => {
             submitBtn.disabled = false;

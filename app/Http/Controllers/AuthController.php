@@ -122,9 +122,9 @@ class AuthController extends Controller
         }
 
         $identifier = trim($request->username);
-        $subscriber = SubscribersModel::where(function($query) use ($identifier) {
+        $subscriber = SubscribersModel::where(function ($query) use ($identifier) {
             $query->where('username', $identifier)
-                  ->orWhere('emailaddress', $identifier);
+                ->orWhere('emailaddress', $identifier);
         })->first();
 
         if (!$subscriber || !Hash::check($request->password, $subscriber->password)) {

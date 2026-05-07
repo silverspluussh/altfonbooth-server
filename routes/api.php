@@ -7,14 +7,17 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 
-Route::post('/signup', [AuthController::class, 'signup'])->name('register');
-Route::post('/verify', [AuthController::class, 'verify']);
-Route::post('/login', [AuthController::class, 'login'])->name('login');
-Route::post('/password/request', [AuthController::class, 'requestPasswordReset']);
-Route::post('/password/reset', [AuthController::class, 'resetPassword']);
+// Public Auth Routes — Strict rate limit: 5 attempts per minute
+Route::middleware('throttle:5,1')->group(function () {
+    Route::post('/signup', [AuthController::class, 'signup'])->name('register');
+    Route::post('/verify', [AuthController::class, 'verify']);
+    Route::post('/login', [AuthController::class, 'login'])->name('login');
+    Route::post('/password/request', [AuthController::class, 'requestPasswordReset']);
+    Route::post('/password/reset', [AuthController::class, 'resetPassword']);
+});
 
-// Protected Routes
-Route::middleware('auth:sanctum')->group(function () {
+// Protected Routes — Standard rate limit: 60 requests per minute
+Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // Current Authenticated User (Subscriber)
     Route::get('/user', function (Request $request) {
         return new \App\Http\Resources\SubscriberResource($request->user());
@@ -37,10 +40,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/destinations', [SubscribersController::class, 'addDest']);
     Route::delete('/destinations', [SubscribersController::class, 'deleteDest']);
 
-    // Credits
-    Route::post('/purchase-credits', [SubscribersController::class, 'purchaseCredits']);
-    Route::post('/payments/initialize', [SubscribersController::class, 'initializePayment']);
-    Route::post('/payments/verify', [SubscribersController::class, 'verifyPayment']);
+    // Credits & Payments — Tighter limit: 10 requests per minute
+    Route::middleware('throttle:10,1')->group(function () {
+        Route::post('/purchase-credits', [SubscribersController::class, 'purchaseCredits']);
+        Route::post('/payments/initialize', [SubscribersController::class, 'initializePayment']);
+        Route::post('/payments/verify', [SubscribersController::class, 'verifyPayment']);
+    });
+    Route::get('/payments/config', [SubscribersController::class, 'getPaymentConfig']);
     Route::get('/purchase-history', [SubscribersController::class, 'getPurchaseHistory']);
 
     // Settings & Updates
@@ -48,11 +54,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/update-auth-account', [SubscribersController::class, 'updateAuthAccount']);
 });
 
-// Admin Routes
+// Admin Routes — Strict login limit: 5 attempts per minute
 Route::prefix('admin')->group(function () {
-    Route::post('/login', [AdminController::class, 'login']);
+    Route::middleware('throttle:5,1')->group(function () {
+        Route::post('/login', [AdminController::class, 'login']);
+    });
 
-    Route::middleware(['auth:sanctum', 'admin.role:manager'])->group(function () {
+    Route::middleware(['auth:sanctum', 'admin.role:manager', 'throttle:60,1'])->group(function () {
         Route::get('/subscribers', [AdminController::class, 'listSubscribers']);
         Route::get('/auth-users', [AdminController::class, 'listAuthUsers']);
 

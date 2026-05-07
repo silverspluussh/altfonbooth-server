@@ -23,6 +23,12 @@ class SubscribersModel extends Model
         'password_reset_expiration'
     ];
 
+    protected $hidden = [
+        'password',
+        'password_reset_token',
+        'password_reset_expiration',
+    ];
+
     public $timestamps = true;
     const CREATED_AT = 'regdatetime';
     const UPDATED_AT = 'regdatetime';

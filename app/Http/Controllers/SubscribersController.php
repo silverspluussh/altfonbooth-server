@@ -20,25 +20,28 @@ class SubscribersController extends Controller
 
     public function index(): JsonResponse
     {
-        $subs = SubscribersModel::all();
-        return response()->json(SubscriberResource::collection($subs));
+        // Protected: Only admins should see the full list. 
+        // For now, we return empty or unauthorized to prevent data leaks.
+        return response()->json(['message' => 'Unauthorized'], 403);
     }
-
 
     public function show($id): JsonResponse
     {
-        $sub = SubscribersModel::find($id);
-        if (!$sub) {
-            return response()->json(['message' => 'Subscriber not found'], 404);
+        $subscriber = request()->user();
+        
+        // A subscriber should only be able to view their own profile.
+        if ($subscriber->subscriberid != $id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
         }
-        return response()->json(new SubscriberResource($sub));
+
+        return response()->json(new SubscriberResource($subscriber));
     }
 
 
     public function updateAuthUsername(Request $request): JsonResponse
     {
         $request->validate([
-            'authusername' => 'required|regex:/^\d+$/',
+            'authusername' => 'required|regex:/^\d+$/|unique:subscriber_auth,authusername,' . ($request->user()->auth?->id ?? 'NULL'),
         ]);
 
         $subscriber = $request->user();
@@ -137,28 +140,42 @@ class SubscribersController extends Controller
 
     /**
      * Add a new auth user for a subscriber.
+     * Auto-generates a unique 6-digit SIP number and a secure password.
      */
     public function addAuthUser(Request $request): JsonResponse
     {
-        $request->validate([
-            'authusername' => 'required|regex:/^\d+$/|unique:subscriber_auth,authusername',
-            'password' => 'nullable|string'
-        ]);
-
-        $plainPassword = $request->password ?? '';
         $subscriber = $request->user();
+
+        // Generate a unique 6-digit auth username
+        $maxAttempts = 20;
+        $authusername = null;
+        for ($i = 0; $i < $maxAttempts; $i++) {
+            $candidate = str_pad(random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
+            if (!SubscriberAuthModel::where('authusername', $candidate)->exists()) {
+                $authusername = $candidate;
+                break;
+            }
+        }
+
+        if (!$authusername) {
+            return response()->json(['status' => false, 'message' => 'Could not generate a unique SIP number. Please try again.'], 500);
+        }
+
+        // Auto-generate an 8-character alphanumeric password
+        $authpassword = Str::random(8);
 
         $auth = SubscriberAuthModel::create([
             'subscriberid' => $subscriber->subscriberid,
-            'authusername' => $request->authusername,
-            'authpassword' => $plainPassword,
+            'authusername' => $authusername,
+            'authpassword' => $authpassword,
             'status' => 'active'
         ]);
 
         return response()->json([
             'status' => true,
-            'authusername' => $request->authusername,
-            'authpassword' => $plainPassword
+            'message' => 'SIP Account created successfully',
+            'authusername' => $authusername,
+            'authpassword' => $authpassword
         ], 201);
     }
 
@@ -171,6 +188,15 @@ class SubscribersController extends Controller
         ]);
 
         $subscriber = $request->user();
+
+        // Security: Ensure the authusername belongs to the authenticated subscriber
+        $authExists = SubscriberAuthModel::where('authusername', $request->authusername)
+            ->where('subscriberid', $subscriber->subscriberid)
+            ->exists();
+
+        if (!$authExists) {
+            return response()->json(['status' => false, 'message' => 'Unauthorized: This SIP account does not belong to you.'], 403);
+        }
 
         $dest = SubscriberDestModel::create([
             'subscriberid' => $subscriber->subscriberid,
@@ -374,6 +400,14 @@ class SubscribersController extends Controller
         return response()->json([
             'status' => true,
             'data' => $history
+        ]);
+    }
+
+    public function getPaymentConfig(): JsonResponse
+    {
+        return response()->json([
+            'status' => true,
+            'paystack_public_key' => config('services.paystack.public_key')
         ]);
     }
 }
