@@ -39,6 +39,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Credits
     Route::post('/purchase-credits', [SubscribersController::class, 'purchaseCredits']);
+    Route::post('/payments/initialize', [SubscribersController::class, 'initializePayment']);
+    Route::post('/payments/verify', [SubscribersController::class, 'verifyPayment']);
     Route::get('/purchase-history', [SubscribersController::class, 'getPurchaseHistory']);
 
     // Settings & Updates

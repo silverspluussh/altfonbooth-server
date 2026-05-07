@@ -12,6 +12,7 @@ use App\Models\SubscribersModel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 class SubscribersController extends Controller
@@ -261,6 +262,102 @@ class SubscribersController extends Controller
             'balance' => $auth->fresh()->balance,
             'transaction_id' => $transactionId
         ]);
+    }
+
+    public function initializePayment(Request $request): JsonResponse
+    {
+        $request->validate([
+            'authusername' => 'required|exists:subscriber_auth,authusername',
+            'amount' => 'required|numeric|min:1',
+        ]);
+
+        $subscriber = $request->user();
+        
+        // Ensure the authusername belongs to the current subscriber
+        $auth = SubscriberAuthModel::where('authusername', $request->authusername)
+            ->where('subscriberid', $subscriber->subscriberid)
+            ->first();
+
+        if (!$auth) {
+            return response()->json(['status' => false, 'message' => 'SIP account not found or unauthorized'], 404);
+        }
+
+        $secretKey = config('services.paystack.secret_key');
+        
+        $response = Http::withToken($secretKey)->post('https://api.paystack.co/transaction/initialize', [
+            'amount' => $request->amount * 100, // Paystack expects amount in kobo
+            'email' => $subscriber->subscriberemail,
+            'metadata' => [
+                'authusername' => $request->authusername,
+                'subscriberid' => $subscriber->subscriberid,
+            ],
+        ]);
+
+        if ($response->successful()) {
+            return response()->json([
+                'status' => true,
+                'data' => $response->json()['data']
+            ]);
+        }
+
+        return response()->json([
+            'status' => false,
+            'message' => 'Could not initialize payment with Paystack',
+            'error' => $response->json()
+        ], 400);
+    }
+
+    public function verifyPayment(Request $request): JsonResponse
+    {
+        $request->validate([
+            'reference' => 'required|string',
+        ]);
+
+        $secretKey = config('services.paystack.secret_key');
+        
+        $response = Http::withToken($secretKey)->get("https://api.paystack.co/transaction/verify/{$request->reference}");
+
+        if ($response->successful()) {
+            $data = $response->json()['data'];
+
+            if ($data['status'] === 'success') {
+                $authusername = $data['metadata']['authusername'];
+                $amount = $data['amount'] / 100; // Convert back from kobo
+
+                // Check if this reference has already been processed to prevent double-crediting
+                $existing = PrepaidCredit::where('transaction_id', $request->reference)->first();
+                if ($existing) {
+                    return response()->json([
+                        'status' => true,
+                        'message' => 'Payment already processed',
+                        'data' => $existing
+                    ]);
+                }
+
+                // Credit the account
+                $credit = PrepaidCredit::create([
+                    'authusername' => $authusername,
+                    'amount' => $amount,
+                    'transaction_id' => $request->reference,
+                    'status' => 'completed'
+                ]);
+
+                $auth = SubscriberAuthModel::where('authusername', $authusername)->first();
+
+                return response()->json([
+                    'status' => true,
+                    'message' => 'Payment verified and account credited',
+                    'balance' => $auth->balance,
+                    'transaction_id' => $request->reference
+                ]);
+            }
+        }
+
+        return response()->json([
+            'status' => false,
+            'message' => 'Payment verification failed',
+            'error' => $response->json()
+        ], 400);
     }
 
     public function getPurchaseHistory(Request $request): JsonResponse

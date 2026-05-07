@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="css/font-awesome.min.css">
   <link rel="stylesheet" href="css/vendor/component.css">
   <link rel="stylesheet" href="css/style.css">
+  <script src="https://js.paystack.co/v1/inline.js"></script>
   <link href="https://fonts.googleapis.com/css?family=Poppins:300,400,500,600,700,800" rel="stylesheet">
   
   <style>
@@ -609,12 +610,12 @@
     }
 
     function openPurchase(username) {
-      document.getElementById('topupSIP').value = username;
+      document.getElementById('buyAuthSelect').value = username;
       openModal('buyCreditsModal');
     }
 
     function populateSelects(list) {
-      const selects = ['topupSIP', 'destSIP'];
+      const selects = ['buyAuthSelect', 'authSelect'];
       selects.forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
@@ -721,13 +722,56 @@
 
     document.getElementById('buyCreditsForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const btn = e.target.querySelector('button[type="submit"]');
+      const authusername = document.getElementById('buyAuthSelect').value;
+      const amount = document.getElementById('creditAmount').value;
+
+      if (!authusername || !amount) return;
+
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      const originalText = submitBtn.innerHTML;
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Initializing...';
+
       try {
-        btn.disabled = true; btn.innerText = 'PROCESSING...';
-        await apiRequest('/purchase-credits', { method: 'POST', body: JSON.stringify({ authusername: document.getElementById('buyAuthSelect').value, amount: document.getElementById('creditAmount').value }) });
-        UI.showToast('Credits added successfully!'); closeModal('buyCreditsModal'); e.target.reset(); init();
-      } catch (error) { UI.showToast(error.message, 'error'); }
-      finally { btn.disabled = false; btn.innerText = 'PURCHASE NOW'; }
+        const res = await apiFetch('/payments/initialize', {
+          method: 'POST',
+          body: JSON.stringify({ authusername, amount })
+        });
+
+        if (!res.status) throw new Error(res.message);
+
+        const handler = PaystackPop.setup({
+          key: 'sk_test_17a973bf685ec84f3ea2555259d4a1d550f0eb1c', // REPLACE WITH YOUR PUBLIC KEY
+          access_code: res.data.access_code,
+          onClose: () => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+          },
+          callback: async (response) => {
+            submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Verifying...';
+            const verifyRes = await apiFetch('/payments/verify', {
+              method: 'POST',
+              body: JSON.stringify({ reference: response.reference })
+            });
+
+            if (verifyRes.status) {
+              showAlert('Success', 'Credits purchased successfully!', 'success');
+              closeModal('buyCreditsModal');
+              fetchAuthList();
+              fetchPurchaseHistory();
+            } else {
+              throw new Error(verifyRes.message);
+            }
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+          }
+        });
+        handler.openIframe();
+      } catch (err) {
+        showAlert('Error', err.message, 'danger');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+      }
     });
 
     async function deleteDest(authUser, dest) {
