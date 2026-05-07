@@ -1,0 +1,12 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # 1. Deactivate /public URL by redirecting to root
+    # This prevents direct access to the Laravel public directory via altfon.com/public
+    RewriteRule ^public/(.*)$ /$1 [L,R=301]
+
+    # 2. Redirect root traffic to the /frontend directory internally
+    # This ensures altfon.com serves the static site files from the frontend folder
+    RewriteCond %{REQUEST_URI} !^/frontend/
+    RewriteRule ^(.*)$ frontend/$1 [L]
+</IfModule>
