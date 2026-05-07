@@ -733,7 +733,7 @@
       submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Initializing...';
 
       try {
-        const res = await apiFetch('/payments/initialize', {
+        const res = await apiRequest('/payments/initialize', {
           method: 'POST',
           body: JSON.stringify({ authusername, amount })
         });
@@ -741,7 +741,7 @@
         if (!res.status) throw new Error(res.message);
 
         const handler = PaystackPop.setup({
-          key: 'sk_test_17a973bf685ec84f3ea2555259d4a1d550f0eb1c', // REPLACE WITH YOUR PUBLIC KEY
+          key: 'sk_test_17a973bf685ec84f3ea2555259d4a1d550f0eb1c', // IMPORTANT: USE PUBLIC KEY (pk_...) NOT SECRET KEY (sk_...)
           access_code: res.data.access_code,
           onClose: () => {
             submitBtn.disabled = false;
@@ -749,18 +749,21 @@
           },
           callback: async (response) => {
             submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Verifying...';
-            const verifyRes = await apiFetch('/payments/verify', {
-              method: 'POST',
-              body: JSON.stringify({ reference: response.reference })
-            });
+            try {
+                const verifyRes = await apiRequest('/payments/verify', {
+                  method: 'POST',
+                  body: JSON.stringify({ reference: response.reference })
+                });
 
-            if (verifyRes.status) {
-              showAlert('Success', 'Credits purchased successfully!', 'success');
-              closeModal('buyCreditsModal');
-              fetchAuthList();
-              fetchPurchaseHistory();
-            } else {
-              throw new Error(verifyRes.message);
+                if (verifyRes.status) {
+                  UI.showToast('Credits purchased successfully!');
+                  closeModal('buyCreditsModal');
+                  init(); // This handles both fetchAuthList and fetchPurchaseHistory logic
+                } else {
+                  throw new Error(verifyRes.message);
+                }
+            } catch (err) {
+                UI.showToast(err.message, 'error');
             }
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalText;
@@ -768,7 +771,7 @@
         });
         handler.openIframe();
       } catch (err) {
-        showAlert('Error', err.message, 'danger');
+        UI.showToast(err.message, 'error');
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalText;
       }
