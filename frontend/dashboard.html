@@ -307,7 +307,7 @@
       </div>
       <div class="stat-card">
         <div class="stat-icon bg-green"><i class="fa fa-money"></i></div>
-        <div class="stat-info"><p>Total Balance</p><h3 id="totalBalance">$0.00</h3></div>
+        <div class="stat-info"><p>Total Balance</p><h3 id="totalBalance">GH₵0.00</h3></div>
       </div>
       <div class="stat-card">
         <div class="stat-icon bg-purple"><i class="fa fa-link"></i></div>
@@ -429,7 +429,7 @@
     <h3>Buy Prepaid Credits</h3><p style="color: var(--secondary); font-size: 0.9rem;">Select an account to top up.</p>
     <form id="buyCreditsForm">
       <div class="form-group"><label>Select SIP Account</label><select id="buyAuthSelect" class="form-control" required></select></div>
-      <div class="form-group"><label>Amount (USD)</label><input type="number" id="creditAmount" class="form-control" min="1" required placeholder="e.g. 50"></div>
+      <div class="form-group"><label>Amount (GHS)</label><input type="number" id="creditAmount" class="form-control" min="1" required placeholder="e.g. 50"></div>
       <div style="display: flex; gap: 12px; margin-top: 25px;"><button type="button" class="btn btn-md btn-outline" style="flex:1;" onclick="closeModal('buyCreditsModal')">Cancel</button><button type="submit" class="btn btn-md btn-success" style="flex:1;">Purchase Now</button></div>
     </form>
   </div></div>
@@ -497,7 +497,7 @@
           row.innerHTML = `
             <td style="padding: 12px 15px;">${new Date(item.created_at).toLocaleDateString()}</td>
             <td style="padding: 12px 15px; font-weight: 600;">${UI.esc(item.authusername)}</td>
-            <td style="padding: 12px 15px; font-weight: 700; color: var(--success);">$${parseFloat(item.amount).toFixed(2)}</td>
+            <td style="padding: 12px 15px; font-weight: 700; color: var(--success);">GH₵${parseFloat(item.amount).toFixed(2)}</td>
             <td style="padding: 12px 15px;"><span class="badge badge-success">${UI.esc(item.status)}</span></td>
           `;
           tbody.appendChild(row);
@@ -571,7 +571,7 @@
 
         document.getElementById('totalDest').innerText = destData.count || 0;
         const totalBal = authAccounts.reduce((acc, curr) => acc + parseFloat(curr.balance || 0), 0);
-        document.getElementById('totalBalance').innerText = `$${totalBal.toFixed(2)}`;
+        document.getElementById('totalBalance').innerText = `GH₵${totalBal.toFixed(2)}`;
 
         // Fetch Payment Config (non-fatal — dashboard works without it)
         try {
@@ -607,7 +607,7 @@
             <span class="badge badge-success">${UI.esc(item.status)}</span>
           </div>
           <div class="sip-label" style="margin-top: 15px;">AVAILABLE BALANCE</div>
-          <div class="sip-balance">$${parseFloat(item.balance || 0).toFixed(2)}</div>
+          <div class="sip-balance">GH₵${parseFloat(item.balance || 0).toFixed(2)}</div>
           <div class="sip-actions">
             <button class="btn btn-sm btn-success" style="flex:1;" onclick="openPurchase('${UI.esc(item.authusername)}')"><i class="fa fa-money"></i> BUY</button>
             <button class="btn btn-sm btn-outline" style="flex:1; color: var(--danger); border-color: var(--danger);" onclick="deleteAuthUser('${UI.esc(item.authusername)}')"><i class="fa fa-trash"></i> DELETE</button>
