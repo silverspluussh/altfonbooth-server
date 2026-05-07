@@ -262,4 +262,21 @@ class SubscribersController extends Controller
             'transaction_id' => $transactionId
         ]);
     }
+
+    public function getPurchaseHistory(Request $request): JsonResponse
+    {
+        $subscriber = $request->user();
+        
+        $authUsernames = SubscriberAuthModel::where('subscriberid', $subscriber->subscriberid)
+            ->pluck('authusername');
+            
+        $history = PrepaidCredit::whereIn('authusername', $authUsernames)
+            ->orderBy('created_at', 'desc')
+            ->get();
+            
+        return response()->json([
+            'status' => true,
+            'data' => $history
+        ]);
+    }
 }

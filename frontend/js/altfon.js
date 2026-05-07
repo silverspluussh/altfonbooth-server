@@ -76,12 +76,12 @@ const UI = {
                 if (parentLi) {
                     // Update text and link to Dashboard
                     link.href = 'dashboard';
-                    link.innerHTML = '<i class="fa fa-dashboard"></i> DASHBOARD';
+                    link.innerHTML = 'Dashboard';
 
                     // Add Logout button next to it
                     const logoutLi = document.createElement('li');
                     logoutLi.className = 'color-10';
-                    logoutLi.innerHTML = `<a href="javascript:Auth.logout()" class="has-icon" style="color: #DC3545 !important;"><i class="fa fa-sign-out"></i> LOGOUT</a>`;
+                    logoutLi.innerHTML = `<a href="javascript:Auth.logout()" class="has-icon" style="color: #DC3545 !important;">Logout</a>`;
                     parentLi.parentNode.insertBefore(logoutLi, parentLi.nextSibling);
                 }
             });
