@@ -35,6 +35,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     Route::post('/auth-username', [SubscribersController::class, 'updateAuthUsername']);
     Route::get('/auth-users', [SubscribersController::class, 'listAuthUsers']);
     Route::post('/auth-users', [SubscribersController::class, 'addAuthUser']);
+    Route::delete('/auth-users', [SubscribersController::class, 'deleteAuthUser']);
 
     // Destination Management
     Route::post('/destinations', [SubscribersController::class, 'addDest']);

@@ -408,7 +408,7 @@
   <div id="addAuthModal" class="modal"><div class="modal-content">
     <h3 style="margin-top:0;">Add SIP Account</h3><p style="color: var(--secondary); font-size: 0.9rem;">A unique 6-digit SIP number and password will be auto-generated for you.</p>
     <form id="addAuthForm">
-      <div style="display: flex; gap: 12px; margin-top: 25px;"><button type="button" class="btn btn-md btn-outline" style="flex:1;" onclick="closeModal('addAuthModal')">Cancel</button><button type="submit" class="btn btn-md btn-primary" style="flex:1;">Generate Account</button></div>
+      <div style="display: flex; gap: 12px; margin-top: 25px;"><button type="button" class="btn btn-md btn-outline" style="flex:1;" onclick="closeModal('addAuthModal')">Cancel</button><button type="submit" class="btn btn-md btn-primary" style="flex:1;">Generate</button></div>
     </form>
   </div></div>
 
@@ -424,15 +424,6 @@
     <button class="btn btn-md btn-primary" style="width: 100%;" onclick="closeModal('credentialsModal')">Done</button>
   </div></div>
 
-  <div id="updateAuthModal" class="modal"><div class="modal-content">
-    <h3 style="margin-top:0;">Update SIP Account</h3><p style="color: var(--secondary); font-size: 0.9rem;">Modify your VOIP credentials.</p>
-    <form id="updateAuthForm">
-      <input type="hidden" id="editAuthId">
-      <div class="form-group"><label>Auth Username (Digits Only)</label><input type="text" id="editAuthUsername" class="form-control" required pattern="\d+"></div>
-      <div class="form-group"><label>Auth Password</label><input type="text" id="editAuthPassword" class="form-control"></div>
-      <div style="display: flex; gap: 12px; margin-top: 25px;"><button type="button" class="btn btn-md btn-outline" style="flex:1;" onclick="closeModal('updateAuthModal')">Cancel</button><button type="submit" class="btn btn-md btn-primary" style="flex:1;">Save Changes</button></div>
-    </form>
-  </div></div>
 
   <div id="buyCreditsModal" class="modal"><div class="modal-content">
     <h3>Buy Prepaid Credits</h3><p style="color: var(--secondary); font-size: 0.9rem;">Select an account to top up.</p>
@@ -619,18 +610,21 @@
           <div class="sip-balance">$${parseFloat(item.balance || 0).toFixed(2)}</div>
           <div class="sip-actions">
             <button class="btn btn-sm btn-success" style="flex:1;" onclick="openPurchase('${UI.esc(item.authusername)}')"><i class="fa fa-money"></i> BUY</button>
-            <button class="btn btn-sm btn-outline" style="flex:1;" onclick="openEditAuth(${JSON.stringify(item).replace(/"/g, '&quot;')})"><i class="fa fa-edit"></i> EDIT</button>
+            <button class="btn btn-sm btn-outline" style="flex:1; color: var(--danger); border-color: var(--danger);" onclick="deleteAuthUser('${UI.esc(item.authusername)}')"><i class="fa fa-trash"></i> DELETE</button>
           </div>
         `;
         grid.appendChild(card);
       });
     }
 
-    function openEditAuth(item) {
-        document.getElementById('editAuthId').value = item.id;
-        document.getElementById('editAuthUsername').value = item.authusername;
-        document.getElementById('editAuthPassword').value = item.authpassword || '';
-        openModal('updateAuthModal');
+    function deleteAuthUser(authusername) {
+      showConfirm('Delete SIP Account', `Are you sure you want to delete SIP account ${authusername}? This will also delete all destination numbers linked to it.`, async () => {
+        try {
+          await apiRequest('/auth-users', { method: 'DELETE', body: JSON.stringify({ authusername }) });
+          UI.showToast('SIP account deleted');
+          init();
+        } catch (error) { UI.showToast(error.message, 'error'); }
+      });
     }
 
     function openPurchase(username) {
@@ -702,25 +696,6 @@
         finally { btn.disabled = false; btn.innerText = 'SAVE PROFILE CHANGES'; }
     });
 
-    document.getElementById('updateAuthForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn = e.target.querySelector('button[type="submit"]');
-        try {
-            btn.disabled = true; btn.innerText = 'SAVING...';
-            await apiRequest('/update-auth-account', {
-                method: 'POST',
-                body: JSON.stringify({
-                    id: document.getElementById('editAuthId').value,
-                    authusername: document.getElementById('editAuthUsername').value,
-                    authpassword: document.getElementById('editAuthPassword').value
-                })
-            });
-            UI.showToast('SIP Account updated!');
-            closeModal('updateAuthModal');
-            init();
-        } catch (error) { UI.showToast(error.message, 'error'); }
-        finally { btn.disabled = false; btn.innerText = 'SAVE CHANGES'; }
-    });
 
     document.getElementById('addAuthForm').addEventListener('submit', async (e) => {
       e.preventDefault();

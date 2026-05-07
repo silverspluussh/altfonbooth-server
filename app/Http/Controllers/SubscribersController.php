@@ -139,6 +139,38 @@ class SubscribersController extends Controller
     }
 
     /**
+     * Delete a SIP account and all related destinations.
+     */
+    public function deleteAuthUser(Request $request): JsonResponse
+    {
+        $request->validate([
+            'authusername' => 'required|string',
+        ]);
+
+        $subscriber = $request->user();
+        $auth = SubscriberAuthModel::where('authusername', $request->authusername)
+            ->where('subscriberid', $subscriber->subscriberid)
+            ->first();
+
+        if (!$auth) {
+            return response()->json(['status' => false, 'message' => 'SIP account not found or unauthorized'], 404);
+        }
+
+        // Delete all related destinations
+        SubscriberDestModel::where('authusername', $request->authusername)
+            ->where('subscriberid', $subscriber->subscriberid)
+            ->delete();
+
+        // Delete the SIP account
+        $auth->delete();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'SIP account and all related destinations deleted'
+        ]);
+    }
+
+    /**
      * Add a new auth user for a subscriber.
      * Auto-generates a unique 6-digit SIP number and a secure password.
      */
