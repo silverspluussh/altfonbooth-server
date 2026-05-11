@@ -360,7 +360,7 @@ class SubscribersController extends Controller
         }
 
         // Validate email
-        if (!$subscriber->subscriberemail) {
+        if (!$subscriber->emailaddress) {
             return response()->json(['status' => false, 'message' => 'Email is required for payment'], 400);
         }
 
@@ -374,7 +374,7 @@ class SubscribersController extends Controller
         try {
             $response = Http::withToken($secretKey)->post('https://api.paystack.co/transaction/initialize', [
                 'amount' => $request->amount * 100, // Paystack expects amount in kobo
-                'email' => $subscriber->subscriberemail,
+                'email' => $subscriber->emailaddress,
                 'metadata' => [
                     'authusername' => $request->authusername,
                     'subscriberid' => $subscriber->subscriberid,
