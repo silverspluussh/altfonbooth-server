@@ -272,6 +272,7 @@
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  
   </style>
 </head>
 <body>
@@ -728,9 +729,13 @@
     document.getElementById('buyCreditsForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const authusername = document.getElementById('buyAuthSelect').value;
-      const amount = document.getElementById('creditAmount').value;
+      const amountStr = document.getElementById('creditAmount').value;
+      const amount = parseFloat(amountStr);
 
-      if (!authusername || !amount) return;
+      if (!authusername || !amount || isNaN(amount)) {
+        UI.showToast('Please select an account and enter a valid amount', 'error');
+        return;
+      }
 
       const submitBtn = e.target.querySelector('button[type="submit"]');
       const originalText = submitBtn.innerHTML;

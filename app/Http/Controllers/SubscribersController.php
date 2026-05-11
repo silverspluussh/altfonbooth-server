@@ -324,12 +324,31 @@ class SubscribersController extends Controller
 
     public function initializePayment(Request $request): JsonResponse
     {
-        $request->validate([
-            'authusername' => 'required|exists:subscriber_auth,authusername',
-            'amount' => 'required|numeric|min:1',
-        ]);
+        try {
+            $validated = $request->validate([
+                'authusername' => 'required|exists:subscriber_auth,authusername',
+                'amount' => 'required|numeric|min:1',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::warning('Payment initialization validation failed', [
+                'errors' => $e->errors(),
+                'input' => $request->only(['authusername', 'amount'])
+            ]);
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed: ' . implode('; ', array_map(
+                    fn($field, $msgs) => "$field: " . implode(', ', $msgs),
+                    array_keys($e->errors()),
+                    array_values($e->errors())
+                ))
+            ], 400);
+        }
 
         $subscriber = $request->user();
+        if (!$subscriber) {
+            \Log::warning('Payment initialization attempted without authentication');
+            return response()->json(['status' => false, 'message' => 'User not authenticated'], 401);
+        }
         
         // Ensure the authusername belongs to the current subscriber
         $auth = SubscriberAuthModel::where('authusername', $request->authusername)
@@ -340,29 +359,54 @@ class SubscribersController extends Controller
             return response()->json(['status' => false, 'message' => 'SIP account not found or unauthorized'], 404);
         }
 
-        $secretKey = config('services.paystack.secret_key');
-        
-        $response = Http::withToken($secretKey)->post('https://api.paystack.co/transaction/initialize', [
-            'amount' => $request->amount * 100, // Paystack expects amount in kobo
-            'email' => $subscriber->subscriberemail,
-            'metadata' => [
-                'authusername' => $request->authusername,
-                'subscriberid' => $subscriber->subscriberid,
-            ],
-        ]);
-
-        if ($response->successful()) {
-            return response()->json([
-                'status' => true,
-                'data' => $response->json()['data']
-            ]);
+        // Validate email
+        if (!$subscriber->subscriberemail) {
+            return response()->json(['status' => false, 'message' => 'Email is required for payment'], 400);
         }
 
-        return response()->json([
-            'status' => false,
-            'message' => 'Could not initialize payment with Paystack',
-            'error' => $response->json()
-        ], 400);
+        $secretKey = config('services.paystack.secret_key');
+        
+        if (!$secretKey) {
+            \Log::error('Paystack secret key not configured');
+            return response()->json(['status' => false, 'message' => 'Payment configuration error'], 500);
+        }
+        
+        try {
+            $response = Http::withToken($secretKey)->post('https://api.paystack.co/transaction/initialize', [
+                'amount' => $request->amount * 100, // Paystack expects amount in kobo
+                'email' => $subscriber->subscriberemail,
+                'metadata' => [
+                    'authusername' => $request->authusername,
+                    'subscriberid' => $subscriber->subscriberid,
+                ],
+            ]);
+
+            if ($response->successful()) {
+                return response()->json([
+                    'status' => true,
+                    'data' => $response->json()['data']
+                ]);
+            }
+
+            // Log error response from Paystack
+            $errorData = $response->json();
+            \Log::error('Paystack initialization failed', [
+                'status' => $response->status(),
+                'error' => $errorData
+            ]);
+
+            return response()->json([
+                'status' => false,
+                'message' => $errorData['message'] ?? 'Could not initialize payment with Paystack',
+                'error' => $errorData
+            ], 400);
+        } catch (\Exception $e) {
+            \Log::error('Paystack API error: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'Payment service error: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function verifyPayment(Request $request): JsonResponse
@@ -373,22 +417,65 @@ class SubscribersController extends Controller
 
         $secretKey = config('services.paystack.secret_key');
         
-        $response = Http::withToken($secretKey)->get("https://api.paystack.co/transaction/verify/{$request->reference}");
+        if (!$secretKey) {
+            \Log::error('Paystack secret key not configured');
+            return response()->json(['status' => false, 'message' => 'Payment configuration error'], 500);
+        }
+        
+        try {
+            $response = Http::withToken($secretKey)->get("https://api.paystack.co/transaction/verify/{$request->reference}");
 
-        if ($response->successful()) {
-            $data = $response->json()['data'];
+            if ($response->successful()) {
+                $responseData = $response->json();
+                
+                // Check if Paystack returned a success response
+                if (!($responseData['status'] ?? false)) {
+                    \Log::warning('Paystack verification returned false status', $responseData);
+                    return response()->json([
+                        'status' => false,
+                        'message' => $responseData['message'] ?? 'Payment verification failed',
+                    ], 400);
+                }
+                
+                $data = $responseData['data'] ?? null;
+                if (!$data) {
+                    \Log::error('Paystack verification response missing data', $responseData);
+                    return response()->json([
+                        'status' => false,
+                        'message' => 'Invalid payment verification response'
+                    ], 400);
+                }
 
-            if ($data['status'] === 'success') {
-                $authusername = $data['metadata']['authusername'];
+                // Check if transaction was successful
+                if (($data['status'] ?? null) !== 'success') {
+                    \Log::warning('Payment not successful', ['transaction_status' => $data['status'] ?? 'unknown']);
+                    return response()->json([
+                        'status' => false,
+                        'message' => 'Payment was not successful. Status: ' . ($data['status'] ?? 'unknown')
+                    ], 400);
+                }
+
+                $authusername = $data['metadata']['authusername'] ?? null;
+                if (!$authusername) {
+                    \Log::error('Paystack response missing authusername in metadata', $data);
+                    return response()->json([
+                        'status' => false,
+                        'message' => 'Invalid payment metadata'
+                    ], 400);
+                }
+
                 $amount = $data['amount'] / 100; // Convert back from kobo
 
                 // Check if this reference has already been processed to prevent double-crediting
                 $existing = PrepaidCredit::where('transaction_id', $request->reference)->first();
                 if ($existing) {
+                    \Log::info('Payment already processed', ['reference' => $request->reference]);
+                    $auth = SubscriberAuthModel::where('authusername', $authusername)->first();
                     return response()->json([
                         'status' => true,
                         'message' => 'Payment already processed',
-                        'data' => $existing
+                        'balance' => $auth?->balance ?? 0,
+                        'transaction_id' => $request->reference
                     ]);
                 }
 
@@ -400,22 +487,42 @@ class SubscribersController extends Controller
                     'status' => 'completed'
                 ]);
 
+                // Get the updated balance (must refresh the auth model to get updated balance)
                 $auth = SubscriberAuthModel::where('authusername', $authusername)->first();
+                
+                \Log::info('Payment verified and account credited', [
+                    'authusername' => $authusername,
+                    'amount' => $amount,
+                    'reference' => $request->reference
+                ]);
 
                 return response()->json([
                     'status' => true,
                     'message' => 'Payment verified and account credited',
-                    'balance' => $auth->balance,
+                    'balance' => $auth?->balance ?? 0,
                     'transaction_id' => $request->reference
                 ]);
             }
-        }
+            
+            // Handle unsuccessful HTTP response
+            $errorData = $response->json();
+            \Log::error('Paystack verification HTTP error', [
+                'status' => $response->status(),
+                'error' => $errorData
+            ]);
 
-        return response()->json([
-            'status' => false,
-            'message' => 'Payment verification failed',
-            'error' => $response->json()
-        ], 400);
+            return response()->json([
+                'status' => false,
+                'message' => $errorData['message'] ?? 'Payment verification failed',
+                'error' => $errorData
+            ], 400);
+        } catch (\Exception $e) {
+            \Log::error('Paystack verification exception: ' . $e->getMessage(), ['exception' => $e]);
+            return response()->json([
+                'status' => false,
+                'message' => 'Payment verification error: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function getPurchaseHistory(Request $request): JsonResponse
