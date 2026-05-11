@@ -726,27 +726,28 @@
     });
 
     
-    document.getElementById('buyCreditsForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const authusername = document.getElementById('buyAuthSelect').value;
-      const amountStr = document.getElementById('creditAmount').value;
-      const amount = parseFloat(amountStr);
+     document.getElementById('buyCreditsForm').addEventListener('submit', async (e) => {
+       e.preventDefault();
+       const authusername = document.getElementById('buyAuthSelect').value;
+       const amountStr = document.getElementById('creditAmount').value;
+       const amount = parseFloat(amountStr);
 
-      if (!authusername || !amount || isNaN(amount)) {
-        UI.showToast('Please select an account and enter a valid amount', 'error');
-        return;
-      }
+       if (!authusername || !amount || isNaN(amount)) {
+         UI.showToast('Please select an account and enter a valid amount', 'error');
+         return;
+       }
 
-      const submitBtn = e.target.querySelector('button[type="submit"]');
-      const originalText = submitBtn.innerHTML;
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Initializing...';
+       const submitBtn = e.target.querySelector('button[type="submit"]');
+       const originalText = submitBtn.innerHTML;
+       submitBtn.disabled = true;
+       submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Initializing...';
 
-      try {
-        const res = await apiRequest('/payments/initialize', {
-          method: 'POST',
-          body: JSON.stringify({ authusername, amount })
-        });
+       try {
+         const email = currentUser?.emailaddress || '';
+         const res = await apiRequest('/payments/initialize', {
+           method: 'POST',
+           body: JSON.stringify({ authusername, amount, email })
+         });
 
         if (!res.status) throw new Error(res.message);
 

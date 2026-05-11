@@ -328,6 +328,7 @@ class SubscribersController extends Controller
             $validated = $request->validate([
                 'authusername' => 'required|exists:subscriber_auth,authusername',
                 'amount' => 'required|numeric|min:1',
+                'email' => 'nullable|email',
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             \Log::warning('Payment initialization validation failed', [
@@ -359,9 +360,11 @@ class SubscribersController extends Controller
             return response()->json(['status' => false, 'message' => 'SIP account not found or unauthorized'], 404);
         }
 
-        // Validate email
-        if (!$subscriber->emailaddress) {
-            return response()->json(['status' => false, 'message' => 'Email is required for payment'], 400);
+        // Get email from request, subscriber profile, or fallback
+        $email = $request->email ?? $subscriber->emailaddress;
+
+        if (!$email) {
+            return response()->json(['status' => false, 'message' => 'Email is required for payment. Please enter your email address or update it in Account Settings.'], 400);
         }
 
         $secretKey = config('services.paystack.secret_key');
@@ -374,7 +377,7 @@ class SubscribersController extends Controller
         try {
             $response = Http::withToken($secretKey)->post('https://api.paystack.co/transaction/initialize', [
                 'amount' => $request->amount * 100, // Paystack expects amount in kobo
-                'email' => $subscriber->emailaddress,
+                'email' => $email,
                 'metadata' => [
                     'authusername' => $request->authusername,
                     'subscriberid' => $subscriber->subscriberid,
