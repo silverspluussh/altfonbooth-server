@@ -375,9 +375,12 @@ class SubscribersController extends Controller
         }
         
         try {
+            $callbackUrl = config('app.frontend_url') . '/dashboard.html';
+            
             $response = Http::withToken($secretKey)->post('https://api.paystack.co/transaction/initialize', [
                 'amount' => $request->amount * 100, // Paystack expects amount in kobo
                 'email' => $email,
+                'callback_url' => $callbackUrl,
                 'metadata' => [
                     'authusername' => $request->authusername,
                     'subscriberid' => $subscriber->subscriberid,

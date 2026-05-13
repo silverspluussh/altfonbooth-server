@@ -726,67 +726,82 @@
     });
 
     
-     document.getElementById('buyCreditsForm').addEventListener('submit', async (e) => {
-       e.preventDefault();
-       const authusername = document.getElementById('buyAuthSelect').value;
-       const amountStr = document.getElementById('creditAmount').value;
-       const amount = parseFloat(amountStr);
+      document.getElementById('buyCreditsForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const authusername = document.getElementById('buyAuthSelect').value;
+        const amountStr = document.getElementById('creditAmount').value;
+        const amount = parseFloat(amountStr);
 
-       if (!authusername || !amount || isNaN(amount)) {
-         UI.showToast('Please select an account and enter a valid amount', 'error');
-         return;
-       }
+        if (!authusername || !amount || isNaN(amount)) {
+          UI.showToast('Please select an account and enter a valid amount', 'error');
+          return;
+        }
 
-       const submitBtn = e.target.querySelector('button[type="submit"]');
-       const originalText = submitBtn.innerHTML;
-       submitBtn.disabled = true;
-       submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Initializing...';
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Initializing...';
 
-       try {
-         const email = currentUser?.emailaddress || '';
-         const res = await apiRequest('/payments/initialize', {
-           method: 'POST',
-           body: JSON.stringify({ authusername, amount, email })
-         });
+        try {
+          const email = currentUser?.emailaddress || '';
+          const res = await apiRequest('/payments/initialize', {
+            method: 'POST',
+            body: JSON.stringify({ authusername, amount, email })
+          });
 
-        if (!res.status) throw new Error(res.message);
+          if (!res.status) throw new Error(res.message);
 
-        const handler = PaystackPop.setup({
-          key: paystackPublicKey,
-          access_code: res.data.access_code,
-          onClose: () => {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalText;
-          },
-          callback: async (response) => {
-            submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Verifying...';
-            try {
-                const verifyRes = await apiRequest('/payments/verify', {
-                  method: 'POST',
-                  body: JSON.stringify({ reference: response.reference })
-                });
-
-                if (verifyRes.status) {
-                  UI.showToast('Credits purchased successfully!');
-                  closeModal('buyCreditsModal');
-                  init(); // This handles both fetchAuthList and fetchPurchaseHistory logic
-                } else {
-                  throw new Error(verifyRes.message);
-                }
-            } catch (err) {
-                UI.showToast(err.message, 'error');
-            }
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalText;
+          // Redirect to Paystack hosted payment page
+          const authUrl = res.data?.authorization_url;
+          if (authUrl) {
+            // Store reference so we can verify after redirect
+            localStorage.setItem('pendingPayment', JSON.stringify({
+              authusername,
+              reference: res.data?.reference || ''
+            }));
+            window.location.href = authUrl;
+          } else {
+            throw new Error('No authorization URL returned from Paystack');
           }
-        });
-        handler.openIframe();
-      } catch (err) {
-        UI.showToast(err.message, 'error');
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = originalText;
-      }
-    });
+        } catch (err) {
+          UI.showToast(err.message, 'error');
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalText;
+        }
+      });
+
+      // Handle redirect back from Paystack with payment reference
+      (async function checkPaymentRedirect() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const trxref = urlParams.get('trxref');
+        const reference = urlParams.get('reference');
+        const paystackRef = trxref || reference;
+
+        if (paystackRef) {
+          // Clean the URL (remove query params)
+          window.history.replaceState({}, document.title, window.location.pathname);
+
+          try {
+            UI.showToast('Verifying payment...', 'info');
+            const verifyRes = await apiRequest('/payments/verify', {
+              method: 'POST',
+              body: JSON.stringify({ reference: paystackRef })
+            });
+
+            if (verifyRes.status) {
+              UI.showToast('Credits purchased successfully!');
+              localStorage.removeItem('pendingPayment');
+            } else {
+              UI.showToast(verifyRes.message || 'Payment verification failed', 'error');
+            }
+          } catch (err) {
+            UI.showToast(err.message, 'error');
+          }
+
+          // Reload dashboard data
+          init();
+        }
+      })();
 
     async function deleteDest(authUser, dest) {
       showConfirm('Delete Destination', `Are you sure you want to delete destination ${dest}?`, async () => {
