@@ -552,7 +552,7 @@ class SubscribersController extends Controller
     {
         return response()->json([
             'status' => true,
-            'paystack_public_key' => config('services.paystack.secret_key')
+            'paystack_public_key' => ''
         ]);
     }
 }
