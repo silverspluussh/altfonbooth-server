@@ -56,7 +56,7 @@ class AdminTest extends TestCase
             'country' => 'GHA',
         ]);
 
-        $response = $this->actingAs($admin, 'sanctum')
+        $response = $this->actingAs($admin, 'admin-api')
                          ->getJson('/api/admin/subscribers');
 
         $response->assertStatus(200)
@@ -76,7 +76,7 @@ class AdminTest extends TestCase
             'role' => 'manager',
         ]);
 
-        $response = $this->actingAs($admin, 'sanctum')
+        $response = $this->actingAs($admin, 'admin-api')
                          ->postJson('/api/admin/admins', [
                              'name' => 'New Admin',
                              'username' => 'newadmin',

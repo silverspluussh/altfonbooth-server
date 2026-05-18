@@ -131,7 +131,7 @@ class AuthController extends Controller
             return response()->json(['status' => false, 'message' => 'Invalid credentials'], 401);
         }
 
-        $token = $subscriber->createToken('auth_token')->plainTextToken;
+        $token = auth('api')->login($subscriber);
 
         return response()->json([
             'status' => true,

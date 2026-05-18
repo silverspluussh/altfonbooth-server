@@ -1,11 +1,10 @@
 <?php
 namespace App\Models;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Laravel\Sanctum\HasApiTokens;
+use Tymon\JWTAuth\Contracts\JWTSubject;
 
-class SubscribersModel extends Authenticatable
+class SubscribersModel extends Authenticatable implements JWTSubject
 {
-    use HasApiTokens;
     protected $table = 'subscribers';
     protected $primaryKey = 'recid';
     protected $fillable = [
@@ -43,6 +42,16 @@ class SubscribersModel extends Authenticatable
     public function getBySubscriberId($subscriberid)
     {
         return $this->where('subscriberid', $subscriberid)->first();
+    }
+
+    public function getJWTIdentifier()
+    {
+        return $this->getKey();
+    }
+
+    public function getJWTCustomClaims()
+    {
+        return [];
     }
 
     public function auth()

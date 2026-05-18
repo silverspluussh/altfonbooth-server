@@ -17,7 +17,7 @@ Route::middleware('throttle:5,1')->group(function () {
 });
 
 // Protected Routes — Standard rate limit: 60 requests per minute
-Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
+Route::middleware(['auth:api', 'throttle:60,1'])->group(function () {
     // Current Authenticated User (Subscriber)
     Route::get('/user', function (Request $request) {
         return new \App\Http\Resources\SubscriberResource($request->user());
@@ -61,7 +61,7 @@ Route::prefix('admin')->group(function () {
         Route::post('/login', [AdminController::class, 'login']);
     });
 
-    Route::middleware(['auth:sanctum', 'admin.role:manager', 'throttle:60,1'])->group(function () {
+    Route::middleware(['auth:admin-api', 'admin.role:manager', 'throttle:60,1'])->group(function () {
         Route::get('/subscribers', [AdminController::class, 'listSubscribers']);
         Route::get('/auth-users', [AdminController::class, 'listAuthUsers']);
 

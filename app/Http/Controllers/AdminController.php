@@ -35,7 +35,7 @@ class AdminController extends Controller
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        $token = $admin->createToken('admin_token', ['admin'])->plainTextToken;
+        $token = auth('admin-api')->login($admin);
 
         return response()->json([
             'status' => true,
