@@ -17,6 +17,36 @@ use Illuminate\Support\Str;
 
 class SubscribersController extends Controller
 {
+    private function callBoothApi(string $endpoint, array $params): ?\Illuminate\Http\Client\Response
+    {
+        $baseUrl = rtrim(env('BOOTH_API_BASE_URL', 'https://63.250.47.51/altfonapp'), '/');
+
+        try {
+            $response = Http::asForm()
+                ->timeout(10)
+                ->connectTimeout(5)
+                ->post("{$baseUrl}/{$endpoint}", $params);
+
+            if (!$response->successful()) {
+                \Log::warning('Booth API request failed', [
+                    'endpoint' => $endpoint,
+                    'params' => $params,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+            }
+
+            return $response;
+        } catch (\Exception $e) {
+            \Log::error('Booth API request exception', [
+                'endpoint' => $endpoint,
+                'params' => $params,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
 
     public function index(): JsonResponse
     {
@@ -237,6 +267,11 @@ class SubscribersController extends Controller
             'status' => 'active'
         ]);
 
+        $this->callBoothApi('booth_add_dest.php', [
+            'accesscode' => $request->authusername,
+            'destination' => $request->destination,
+        ]);
+
         return response()->json([
             'status' => true,
             'message' => 'Destination added successfully',
@@ -263,6 +298,11 @@ class SubscribersController extends Controller
             ->where('authusername', $request->authusername)
             ->where('destination', $request->destination)
             ->delete();
+
+        $this->callBoothApi('booth_del_dest.php', [
+            'accesscode' => $request->authusername,
+            'destination' => $request->destination,
+        ]);
 
         return response()->json([
             'status' => true,
@@ -314,10 +354,20 @@ class SubscribersController extends Controller
             'status' => 'completed'
         ]);
 
+        $this->callBoothApi('booth_topup.php', [
+            'accesscode' => $request->authusername,
+            'amount' => $request->amount,
+        ]);
+
+        $externalBalance = $this->callBoothApi('booth_getbal.php', [
+            'accesscode' => $request->authusername,
+        ]);
+
+        // 'balance' => $auth->fresh()->balance,
         return response()->json([
             'status' => true,
             'message' => 'Credits purchased successfully',
-            'balance' => $auth->fresh()->balance,
+            'balance' => $externalBalance ? trim($externalBalance->body()) : 'N/A',
             'transaction_id' => $transactionId
         ]);
     }
@@ -476,11 +526,17 @@ class SubscribersController extends Controller
                 $existing = PrepaidCredit::where('transaction_id', $request->reference)->first();
                 if ($existing) {
                     \Log::info('Payment already processed', ['reference' => $request->reference]);
-                    $auth = SubscriberAuthModel::where('authusername', $authusername)->first();
+
+                    $externalBalance = $this->callBoothApi('booth_getbal.php', [
+                        'accesscode' => $authusername,
+                    ]);
+
+                    // $auth = SubscriberAuthModel::where('authusername', $authusername)->first();
                     return response()->json([
                         'status' => true,
                         'message' => 'Payment already processed',
-                        'balance' => $auth?->balance ?? 0,
+                        // 'balance' => $auth?->balance ?? 0,
+                        'balance' => $externalBalance ? trim($externalBalance->body()) : 'N/A',
                         'transaction_id' => $request->reference
                     ]);
                 }
@@ -493,9 +549,18 @@ class SubscribersController extends Controller
                     'status' => 'completed'
                 ]);
 
+                $this->callBoothApi('booth_topup.php', [
+                    'accesscode' => $authusername,
+                    'amount' => $amount,
+                ]);
+
+                $externalBalance = $this->callBoothApi('booth_getbal.php', [
+                    'accesscode' => $authusername,
+                ]);
+
                 // Get the updated balance (must refresh the auth model to get updated balance)
-                $auth = SubscriberAuthModel::where('authusername', $authusername)->first();
-                
+                // $auth = SubscriberAuthModel::where('authusername', $authusername)->first();
+
                 \Log::info('Payment verified and account credited', [
                     'authusername' => $authusername,
                     'amount' => $amount,
@@ -505,7 +570,8 @@ class SubscribersController extends Controller
                 return response()->json([
                     'status' => true,
                     'message' => 'Payment verified and account credited',
-                    'balance' => $auth?->balance ?? 0,
+                    // 'balance' => $auth?->balance ?? 0,
+                    'balance' => $externalBalance ? trim($externalBalance->body()) : 'N/A',
                     'transaction_id' => $request->reference
                 ]);
             }
@@ -553,6 +619,32 @@ class SubscribersController extends Controller
         return response()->json([
             'status' => true,
             'paystack_public_key' => ''
+        ]);
+    }
+
+    public function getBalance(Request $request): JsonResponse
+    {
+        $request->validate([
+            'authusername' => 'required|regex:/^\d+$/',
+        ]);
+
+        $subscriber = $request->user();
+
+        $authExists = SubscriberAuthModel::where('authusername', $request->authusername)
+            ->where('subscriberid', $subscriber->subscriberid)
+            ->exists();
+
+        if (!$authExists) {
+            return response()->json(['status' => false, 'message' => 'Unauthorized: This SIP account does not belong to you.'], 403);
+        }
+
+        $response = $this->callBoothApi('booth_getbal.php', [
+            'accesscode' => $request->authusername,
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'balance' => $response ? trim($response->body()) : 'N/A',
         ]);
     }
 }

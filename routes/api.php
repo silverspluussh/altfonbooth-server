@@ -53,6 +53,9 @@ Route::middleware(['auth:api', 'throttle:60,1'])->group(function () {
     // Settings & Updates
     Route::post('/update-profile', [SubscribersController::class, 'updateProfile']);
     Route::post('/update-auth-account', [SubscribersController::class, 'updateAuthAccount']);
+
+    // Balance
+    Route::post('/get-balance', [SubscribersController::class, 'getBalance']);
 });
 
 // Admin Routes — Strict login limit: 5 attempts per minute
