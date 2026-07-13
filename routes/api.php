@@ -41,13 +41,11 @@ Route::middleware(['auth:api', 'throttle:60,1'])->group(function () {
     Route::post('/destinations', [SubscribersController::class, 'addDest']);
     Route::delete('/destinations', [SubscribersController::class, 'deleteDest']);
 
-    // Credits & Payments — Tighter limit: 10 requests per minute
-    Route::middleware('throttle:10,1')->group(function () {
+    // Credits & Payments (auth required)
+    Route::middleware('throttle:20,1')->group(function () {
         Route::post('/purchase-credits', [SubscribersController::class, 'purchaseCredits']);
         Route::post('/payments/initialize', [SubscribersController::class, 'initializePayment']);
-        Route::post('/payments/verify', [SubscribersController::class, 'verifyPayment']);
     });
-    Route::get('/payments/config', [SubscribersController::class, 'getPaymentConfig']);
     Route::get('/purchase-history', [SubscribersController::class, 'getPurchaseHistory']);
 
     // Settings & Updates
@@ -57,6 +55,10 @@ Route::middleware(['auth:api', 'throttle:60,1'])->group(function () {
     // Balance
     Route::post('/get-balance', [SubscribersController::class, 'getBalance']);
 });
+
+// Payment verification & config — no auth required (Paystack API is the source of truth)
+Route::post('/payments/verify', [SubscribersController::class, 'verifyPayment'])->middleware('throttle:20,1');
+Route::get('/payments/config', [SubscribersController::class, 'getPaymentConfig']);
 
 // Admin Routes — Strict login limit: 5 attempts per minute
 Route::prefix('admin')->group(function () {

@@ -108,6 +108,8 @@ async function apiRequest(endpoint, options = {}) {
         defaultHeaders['Authorization'] = `Bearer ${token}`;
     }
 
+    const method = (options.method || 'GET').toUpperCase();
+
     const response = await fetch(`${CONFIG.API_BASE}${endpoint}`, {
         ...options,
         headers: {
@@ -116,12 +118,14 @@ async function apiRequest(endpoint, options = {}) {
         }
     });
 
+    const data = await response.json();
+
+    console.log(`[API] ${method} ${endpoint} → ${response.status}`, data);
+
     // Handle rate limiting (429)
     if (response.status === 429) {
-        throw new Error('Too many requests. Please wait a moment and try again.');
+        throw new Error(data.message || 'Too many requests. Please wait a moment and try again.');
     }
-
-    const data = await response.json();
 
     if (!response.ok) {
         if (response.status === 401) {

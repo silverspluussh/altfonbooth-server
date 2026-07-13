@@ -19,7 +19,7 @@ class SubscribersController extends Controller
 {
     private function callBoothApi(string $endpoint, array $params): ?\Illuminate\Http\Client\Response
     {
-        $baseUrl = rtrim(env('BOOTH_API_BASE_URL', 'https://63.250.47.51/altfonapp'), '/');
+        $baseUrl = rtrim(env('BOOTH_API_BASE_URL', 'http://63.250.47.51/altfonapp'), '/');
 
         try {
             $response = Http::asForm()
