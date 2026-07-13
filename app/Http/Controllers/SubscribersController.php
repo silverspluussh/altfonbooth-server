@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Resources\SubscriberAuthResource;
 use App\Http\Resources\SubscriberDestResource;
 use App\Http\Resources\SubscriberResource;
 use App\Models\PrepaidCredit;
@@ -45,6 +44,17 @@ class SubscribersController extends Controller
             ]);
             return null;
         }
+    }
+
+    private function extractBalanceFromResponse(?\Illuminate\Http\Client\Response $response): ?float
+    {
+        if (!$response) return null;
+
+        $body = json_decode(trim($response->body()), true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) return null;
+
+        return $body['balance'] ?? null;
     }
 
 
@@ -165,7 +175,25 @@ class SubscribersController extends Controller
     {
         $subscriber = $request->user();
         $auths = SubscriberAuthModel::where('subscriberid', $subscriber->subscriberid)->get();
-        return response()->json(SubscriberAuthResource::collection($auths));
+
+        $result = $auths->map(function ($auth) {
+            $response = $this->callBoothApi('booth_getbal.php', [
+                'accesscode' => $auth->authusername,
+            ]);
+
+            return [
+                'id' => $auth->id,
+                'subscriberid' => $auth->subscriberid,
+                'authusername' => $auth->authusername,
+                'authpassword' => $auth->authpassword,
+                'balance' => $this->extractBalanceFromResponse($response) ?? 0.00,
+                'status' => $auth->status,
+                'created_at' => $auth->created_at,
+                'updated_at' => $auth->updated_at,
+            ];
+        });
+
+        return response()->json(['data' => $result]);
     }
 
     /**
@@ -363,11 +391,10 @@ class SubscribersController extends Controller
             'accesscode' => $request->authusername,
         ]);
 
-        // 'balance' => $auth->fresh()->balance,
         return response()->json([
             'status' => true,
             'message' => 'Credits purchased successfully',
-            'balance' => $externalBalance ? trim($externalBalance->body()) : 'N/A',
+            'balance' => $this->extractBalanceFromResponse($externalBalance) ?? 'N/A',
             'transaction_id' => $transactionId
         ]);
     }
@@ -531,12 +558,10 @@ class SubscribersController extends Controller
                         'accesscode' => $authusername,
                     ]);
 
-                    // $auth = SubscriberAuthModel::where('authusername', $authusername)->first();
                     return response()->json([
                         'status' => true,
                         'message' => 'Payment already processed',
-                        // 'balance' => $auth?->balance ?? 0,
-                        'balance' => $externalBalance ? trim($externalBalance->body()) : 'N/A',
+                        'balance' => $this->extractBalanceFromResponse($externalBalance) ?? 'N/A',
                         'transaction_id' => $request->reference
                     ]);
                 }
@@ -558,9 +583,6 @@ class SubscribersController extends Controller
                     'accesscode' => $authusername,
                 ]);
 
-                // Get the updated balance (must refresh the auth model to get updated balance)
-                // $auth = SubscriberAuthModel::where('authusername', $authusername)->first();
-
                 \Log::info('Payment verified and account credited', [
                     'authusername' => $authusername,
                     'amount' => $amount,
@@ -570,8 +592,7 @@ class SubscribersController extends Controller
                 return response()->json([
                     'status' => true,
                     'message' => 'Payment verified and account credited',
-                    // 'balance' => $auth?->balance ?? 0,
-                    'balance' => $externalBalance ? trim($externalBalance->body()) : 'N/A',
+                    'balance' => $this->extractBalanceFromResponse($externalBalance) ?? 'N/A',
                     'transaction_id' => $request->reference
                 ]);
             }
@@ -644,7 +665,7 @@ class SubscribersController extends Controller
 
         return response()->json([
             'status' => true,
-            'balance' => $response ? trim($response->body()) : 'N/A',
+            'balance' => $this->extractBalanceFromResponse($response) ?? 'N/A',
         ]);
     }
 }

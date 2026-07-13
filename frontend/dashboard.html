@@ -616,7 +616,6 @@
           <div class="sip-balance">GH₵${parseFloat(item.balance || 0).toFixed(2)}</div>
           <div class="sip-actions">
             <button class="btn btn-sm btn-success" style="flex:1;" onclick="openPurchase('${UI.esc(item.authusername)}')"><i class="fa fa-money"></i> BUY</button>
-            <button class="btn btn-sm btn-outline" style="flex:1; color: var(--danger); border-color: var(--danger);" onclick="deleteAuthUser('${UI.esc(item.authusername)}')"><i class="fa fa-trash"></i> DELETE</button>
           </div>
         `;
         grid.appendChild(card);
