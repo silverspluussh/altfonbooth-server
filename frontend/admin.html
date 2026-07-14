@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Altfon Admin</title>
+    <link rel="stylesheet" href="css/font-awesome.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --sidebar-w: 260px;
+            --primary: #010a4c;
+            --primary-light: #1e2a6e;
+            --danger: #DC3545;
+            --success: #059669;
+            --warning: #d97706;
+            --bg: #f1f5f9;
+            --card-bg: #fff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        a { text-decoration: none; color: inherit; }
+        .hide { display: none !important; }
+
+        /* ---- LOGIN VIEW ---- */
+        #login-view {
+            display: flex; align-items: center; justify-content: center;
+            min-height: 100vh; background: var(--primary);
+            padding: 2rem;
+        }
+        .login-card {
+            background: #fff; border-radius: 16px; padding: 3rem;
+            width: 100%; max-width: 420px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .login-card h1 { font-size: 1.8rem; font-weight: 800; color: var(--primary); margin-bottom: .25rem; }
+        .login-card p { color: var(--text-muted); margin-bottom: 2rem; font-size: .9rem; }
+        .login-card label { display: block; font-weight: 600; font-size: .85rem; margin-bottom: .4rem; color: var(--text); }
+        .login-card input {
+            width: 100%; padding: .75rem 1rem; border: 2px solid var(--border);
+            border-radius: 10px; font-size: .95rem; margin-bottom: 1.2rem; outline: none;
+            transition: border .2s;
+        }
+        .login-card input:focus { border-color: var(--primary); }
+        .login-card button {
+            width: 100%; padding: .85rem; background: var(--primary); color: #fff;
+            border: none; border-radius: 10px; font-size: 1rem; font-weight: 600;
+            cursor: pointer; transition: opacity .2s;
+        }
+        .login-card button:hover { opacity: .9; }
+        .login-card button:disabled { opacity: .6; cursor: not-allowed; }
+
+        /* ---- APP LAYOUT ---- */
+        #app-view { display: none; min-height: 100vh; }
+
+        /* Sidebar */
+        #sidebar {
+            position: fixed; top: 0; left: 0; width: var(--sidebar-w); height: 100vh;
+            background: var(--primary); color: #fff; z-index: 100;
+            display: flex; flex-direction: column; overflow-y: auto;
+        }
+        #sidebar .brand {
+            padding: 1.5rem 1.5rem 1rem; font-size: 1.4rem; font-weight: 800;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        #sidebar .brand span { color: rgba(255,255,255,0.6); font-weight: 400; }
+        #sidebar nav { flex: 1; padding: 1rem 0; }
+        #sidebar nav a {
+            display: flex; align-items: center; gap: .75rem;
+            padding: .75rem 1.5rem; color: rgba(255,255,255,0.7);
+            font-size: .9rem; font-weight: 500; transition: all .2s;
+        }
+        #sidebar nav a:hover { background: rgba(255,255,255,0.08); color: #fff; }
+        #sidebar nav a.active {
+            background: rgba(255,255,255,0.12); color: #fff;
+            border-right: 3px solid #fff;
+        }
+        #sidebar nav a i { width: 20px; text-align: center; font-size: 1.1rem; }
+        #sidebar .sidebar-footer {
+            padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        #sidebar .sidebar-footer a {
+            color: rgba(255,255,255,0.7); font-size: .85rem; display: flex; align-items: center; gap: .5rem;
+        }
+        #sidebar .sidebar-footer a:hover { color: #fff; }
+
+        #sidebar-toggle { display: none; }
+        #sidebar-overlay { display: none; }
+
+        /* Main */
+        #main {
+            margin-left: var(--sidebar-w); flex: 1; min-height: 100vh;
+        }
+        #main-header {
+            background: var(--card-bg); border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between;
+            position: sticky; top: 0; z-index: 50;
+        }
+        #main-header h2 { font-size: 1.1rem; font-weight: 700; }
+        #main-header .admin-info { font-size: .85rem; color: var(--text-muted); }
+        #app-content { padding: 2rem; }
+
+        /* ---- COMPONENTS ---- */
+        .page-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;
+        }
+        .page-header h2 { font-size: 1.4rem; font-weight: 700; }
+
+        .btn {
+            display: inline-flex; align-items: center; gap: .4rem;
+            padding: .55rem 1.2rem; border-radius: 8px; font-size: .85rem;
+            font-weight: 600; cursor: pointer; border: 2px solid transparent;
+            transition: all .2s; font-family: inherit;
+        }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover { background: var(--primary-light); }
+        .btn-sm { padding: .35rem .8rem; font-size: .78rem; }
+        .btn-outline { background: transparent; border-color: var(--border); color: var(--text); }
+        .btn-outline:hover { border-color: var(--text-muted); }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-danger:hover { opacity: .9; }
+        .btn:disabled { opacity: .6; cursor: not-allowed; }
+
+        .stat-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.25rem; margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: var(--card-bg); border-radius: 12px; padding: 1.5rem;
+            display: flex; align-items: center; gap: 1rem;
+            border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .stat-icon {
+            width: 48px; height: 48px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.4rem; flex-shrink: 0;
+        }
+        .stat-info p { font-size: .8rem; color: var(--text-muted); font-weight: 500; margin-bottom: .15rem; }
+        .stat-info h3 { font-size: 1.5rem; font-weight: 800; }
+
+        .card {
+            background: var(--card-bg); border-radius: 12px; padding: 1.5rem;
+            border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 1rem; }
+
+        .dashboard-grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 1.25rem;
+        }
+        @media (max-width: 900px) {
+            .dashboard-grid { grid-template-columns: 1fr; }
+        }
+
+        /* Table */
+        .table-wrap { overflow-x: auto; }
+        table {
+            width: 100%; border-collapse: collapse; font-size: .85rem;
+        }
+        table th {
+            text-align: left; padding: .75rem 1rem; font-weight: 600;
+            color: var(--text-muted); font-size: .78rem; text-transform: uppercase;
+            letter-spacing: .03em; border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+        }
+        table td {
+            padding: .7rem 1rem; border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+        table tr:hover td { background: #f8fafc; }
+        .action-cell { white-space: nowrap; }
+        .action-cell .btn { margin-right: .3rem; }
+        code { background: #f1f5f9; padding: .15rem .4rem; border-radius: 4px; font-size: .8rem; }
+
+        .badge {
+            display: inline-block; padding: .2rem .6rem; border-radius: 20px;
+            font-size: .75rem; font-weight: 600;
+        }
+        .badge-success { background: #dcfce7; color: #166534; }
+        .badge-danger { background: #fce4ec; color: #c62828; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-primary { background: #dbeafe; color: #1e40af; }
+        .badge-secondary { background: #f1f5f9; color: #475569; }
+
+        .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted); }
+        .error-state { text-align: center; padding: 3rem 1rem; color: var(--danger); }
+
+        /* Search */
+        .search-bar { margin-bottom: 1rem; }
+        .search-bar input {
+            width: 100%; max-width: 400px; padding: .6rem 1rem;
+            border: 2px solid var(--border); border-radius: 8px; font-size: .9rem;
+            outline: none; font-family: inherit;
+        }
+        .search-bar input:focus { border-color: var(--primary); }
+
+        /* Modal */
+        #modal-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+            z-index: 200; align-items: center; justify-content: center;
+            padding: 2rem;
+        }
+        #modal-overlay.active { display: flex; }
+        .modal {
+            background: #fff; border-radius: 16px; width: 100%; max-width: 520px;
+            max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+        .modal-header {
+            padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .modal-header h3 { font-size: 1.1rem; font-weight: 700; }
+        .modal-close {
+            background: none; border: none; font-size: 1.5rem; cursor: pointer;
+            color: var(--text-muted); padding: .25rem; line-height: 1;
+        }
+        .modal-close:hover { color: var(--text); }
+        .modal-body { padding: 1.5rem; }
+        .modal-footer {
+            padding: 1rem 1.5rem; border-top: 1px solid var(--border);
+            display: flex; justify-content: flex-end; gap: .75rem;
+        }
+
+        /* Form inside modal */
+        .modal-body label {
+            display: block; font-weight: 600; font-size: .82rem;
+            margin-bottom: .35rem; color: var(--text);
+        }
+        .modal-body input, .modal-body select, .modal-body textarea {
+            width: 100%; padding: .6rem .8rem; border: 2px solid var(--border);
+            border-radius: 8px; font-size: .9rem; margin-bottom: 1rem;
+            outline: none; font-family: inherit; transition: border .2s;
+        }
+        .modal-body input:focus, .modal-body select:focus { border-color: var(--primary); }
+
+        /* Loader */
+        .loader-wrapper {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; padding: 3rem; color: var(--text-muted);
+        }
+        .spinner {
+            width: 36px; height: 36px; border: 3px solid var(--border);
+            border-top-color: var(--primary); border-radius: 50%;
+            animation: spin .6s linear infinite; margin-bottom: 1rem;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            :root { --sidebar-w: 0px; }
+            #sidebar {
+                transform: translateX(-100%); transition: transform .3s;
+                width: 260px;
+            }
+            #sidebar.open { transform: translateX(0); }
+            #sidebar-overlay {
+                display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+                z-index: 99;
+            }
+            #sidebar.open ~ #sidebar-overlay { display: block; }
+            #sidebar-toggle {
+                display: inline-flex; align-items: center; justify-content: center;
+                background: none; border: none; font-size: 1.3rem; cursor: pointer;
+                color: var(--text); padding: .25rem;
+            }
+            #main { margin-left: 0; }
+            #main-header { padding: 1rem; }
+            #app-content { padding: 1rem; }
+            .stat-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- LOGIN VIEW -->
+<div id="login-view">
+    <div class="login-card">
+        <h1>Altfon Admin</h1>
+        <p>Sign in to manage your platform</p>
+        <form id="login-form">
+            <label>Username</label>
+            <input id="login-username" type="text" required autocomplete="username">
+            <label>Password</label>
+            <input id="login-password" type="password" required autocomplete="current-password">
+            <button type="submit">Login</button>
+        </form>
+    </div>
+</div>
+
+<!-- APP VIEW -->
+<div id="app-view">
+    <!-- Sidebar Overlay (mobile) -->
+    <div id="sidebar-overlay" onclick="document.getElementById('sidebar').classList.remove('open')"></div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar">
+        <div class="brand">Altfon <span>Admin</span></div>
+        <nav>
+            <a href="#dashboard" data-view="dashboard"><i class="fa fa-dashboard"></i> Dashboard</a>
+            <a href="#subscribers" data-view="subscribers"><i class="fa fa-users"></i> Subscribers</a>
+            <a href="#auth-users" data-view="auth-users"><i class="fa fa-phone"></i> SIP Accounts</a>
+            <a href="#destinations" data-view="destinations"><i class="fa fa-map-marker"></i> Destinations</a>
+            <a href="#purchase-history" data-view="purchase-history"><i class="fa fa-credit-card"></i> Credits & History</a>
+            <a href="#admins" data-view="admins"><i class="fa fa-shield"></i> Admin Management</a>
+            <a href="#settings" data-view="settings"><i class="fa fa-cog"></i> Settings</a>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="#" id="logout-btn"><i class="fa fa-sign-out"></i> Logout</a>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div id="main">
+        <header id="main-header">
+            <div style="display:flex;align-items:center;gap:.75rem;">
+                <button id="sidebar-toggle"><i class="fa fa-bars"></i></button>
+                <h2 id="page-title">Dashboard</h2>
+            </div>
+            <div class="admin-info" id="header-admin-info">Admin</div>
+        </header>
+        <div id="app-content">
+            <!-- Dynamic content rendered by admin.js -->
+        </div>
+    </div>
+</div>
+
+<!-- MODAL -->
+<div id="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modal-title">Modal</h3>
+            <button class="modal-close" id="modal-close">&times;</button>
+        </div>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" id="modal-cancel-btn">Cancel</button>
+            <button class="btn btn-primary" id="modal-submit">Save</button>
+        </div>
+    </div>
+</div>
+
+<script src="js/altfon.js"></script>
+<script src="js/admin.js"></script>
+
+</body>
+</html>

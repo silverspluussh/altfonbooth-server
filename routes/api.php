@@ -67,8 +67,36 @@ Route::prefix('admin')->group(function () {
     });
 
     Route::middleware(['auth:admin-api', 'admin.role:manager', 'throttle:60,1'])->group(function () {
+        // Dashboard
+        Route::get('/dashboard', [AdminController::class, 'dashboard']);
+
+        // Admin Profile
+        Route::put('/profile', [AdminController::class, 'updateProfile']);
+
+        // Subscriber Management
         Route::get('/subscribers', [AdminController::class, 'listSubscribers']);
+        Route::get('/subscribers/{id}', [AdminController::class, 'showSubscriber']);
+        Route::post('/subscribers', [AdminController::class, 'storeSubscriber']);
+        Route::put('/subscribers/{id}', [AdminController::class, 'updateSubscriber']);
+        Route::delete('/subscribers/{id}', [AdminController::class, 'deleteSubscriber']);
+
+        // SIP Account Management
         Route::get('/auth-users', [AdminController::class, 'listAuthUsers']);
+        Route::get('/auth-users/{id}', [AdminController::class, 'showAuthUser']);
+        Route::post('/auth-users', [AdminController::class, 'storeAuthUser']);
+        Route::put('/auth-users/{id}', [AdminController::class, 'updateAuthUser']);
+        Route::delete('/auth-users/{id}', [AdminController::class, 'deleteAuthUser']);
+
+        // Destination Management
+        Route::get('/destinations', [AdminController::class, 'listDestinations']);
+        Route::get('/destinations/{id}', [AdminController::class, 'showDestination']);
+        Route::post('/destinations', [AdminController::class, 'storeDestination']);
+        Route::put('/destinations/{id}', [AdminController::class, 'updateDestination']);
+        Route::delete('/destinations/{id}', [AdminController::class, 'deleteDestination']);
+
+        // Credits / Purchase History
+        Route::get('/purchase-history', [AdminController::class, 'listPurchaseHistory']);
+        Route::post('/credits', [AdminController::class, 'addCredits']);
 
         // Super Admin only routes
         Route::middleware('admin.role:super_admin')->group(function () {
