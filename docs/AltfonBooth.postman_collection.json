@@ -1,0 +1,1139 @@
+{
+  "info": {
+    "_postman_id": "altfonbooth-api",
+    "name": "Altfon Booth API",
+    "description": "Altfon Booth REST API. Endpoints grouped by client surface:\n\n- **Web** (`/api/*`) - modern web app: subscriber auth, SIP accounts, destinations, payments\n- **Admin** (`/api/admin/*`) - admin dashboard (manager/super_admin roles)\n- **Mobile (Legacy)** (`/api/v1/*`) - legacy CodeIgniter surface for the mobile app (CI-style envelope)\n\nApplies to: signup near-signal. Auth via JWT Bearer token.\n\n## Auth\n- **Web**: `Authorization: Bearer <token>` from `POST /api/signup` -> `POST /api/verify` then `POST /api/login`\n- **Admin**: `Authorization: Bearer <token>` from `POST /api/admin/login`\n- **Mobile (Legacy)**: `Authorization: Bearer <access_token>` from `POST /api/v1/login`\n\n## Mobile (Legacy) envelope note\nAll `/api/v1/*` responses use a CI-style envelope: `{ status, error:{code,message}, reason }` on failure and `{ status, code, data, message }` on success.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://appapi.altfon.com"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "mobileToken",
+      "value": ""
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Web",
+      "item": [
+        {
+          "name": "Auth",
+          "item": [
+            {
+              "name": "Signup",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/signup",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "signup"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"johndoe\",\n  \"password\": \"password123\",\n  \"confirm_password\": \"password123\",\n  \"phonenumber\": \"233201234567\",\n  \"fullname\": \"John Doe\",\n  \"emailaddress\": \"john@example.com\",\n  \"country\": \"Ghana\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Public. Rate: 5/min. Creates a temp subscriber and sends an OTP via SMS/email. Returns `debug_otp` (dev only).\n\nFields: username (unique), password (min 8), phonenumber (unique), fullname, emailaddress, country."
+              }
+            },
+            {
+              "name": "Verify OTP",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/verify",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "verify"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"phonenumber\": \"233201234567\",\n  \"otp\": \"123456\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Public. Rate: 5/min. Verifies the OTP and creates the permanent subscriber + default SIP account. Provide either `phonenumber` or `subscriberid`, and either `otp` or `code`."
+              }
+            },
+            {
+              "name": "Login",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/login",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "login"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"johndoe\",\n  \"password\": \"password123\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Public. Rate: 5/min. `username` may be username or email. Returns `token` and `user`. If registration is still pending, re-issues an OTP instead."
+              }
+            },
+            {
+              "name": "Request Password Reset",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/password/request",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "password", "request"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"john@example.com\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Public. Rate: 5/min. Sends a 6-digit password reset code to the subscriber's email/phone."
+              }
+            },
+            {
+              "name": "Reset Password",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/password/reset",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "password", "reset"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"token\": \"123456\",\n  \"password\": \"newpassword123\",\n  \"confirm_password\": \"newpassword123\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Public. Rate: 5/min. Resets the password using the code from `/api/password/request`. Password min 8."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Account & SIP",
+          "item": [
+            {
+              "name": "Get Current User",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/user",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "user"]
+                },
+                "description": "Auth (web token). Rate: 60/min. Returns the authenticated subscriber's profile."
+              }
+            },
+            {
+              "name": "Update Profile",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/update-profile",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "update-profile"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"fullname\": \"John Q. Doe\",\n  \"emailaddress\": \"john.doe@example.com\",\n  \"password\": \"optionalnewpass\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Auth (web token). Rate: 60/min. Update fullname, emailaddress, password."
+              }
+            },
+            {
+              "name": "Get My Destinations",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/my-destinations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "my-destinations"]
+                },
+                "description": "Auth (web token). Rate: 60/min. Returns the current subscriber's destinations."
+              }
+            },
+            {
+              "name": "List Auth Users (My SIP Accounts)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth-users",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth-users"]
+                },
+                "description": "Auth (web token). Rate: 60/min. Returns the subscriber's own SIP accounts (authusername, authpassword, balance, status)."
+              }
+            },
+            {
+              "name": "Add Auth User (Create SIP Account)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth-users",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth-users"]
+                },
+                "description": "Auth (web token). Rate: 60/min. No body needed - server auto-generates unique 6-digit authusername and 8-char authpassword. Returns both."
+              }
+            },
+            {
+              "name": "Update Auth Username",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth-username",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth-username"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"authusername\": \"654321\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Auth (web token). Rate: 60/min. Updates the default SIP username for the subscriber. Must be digits."
+              }
+            },
+            {
+              "name": "Update Auth Account",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/update-auth-account",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "update-auth-account"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"id\": 1,\n  \"authusername\": \"654321\",\n  \"authpassword\": \"newpass12\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Auth (web token). Rate: 60/min. Update an existing auth account by its DB `id` and authusername."
+              }
+            },
+            {
+              "name": "Delete Auth User",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth-users",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth-users"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"authusername\": \"654321\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Auth (web token). Rate: 60/min. Deletes the SIP account and all related destinations."
+              }
+            },
+            {
+              "name": "Get Balance",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/get-balance",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "get-balance"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"authusername\": \"123456\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Auth (web token). Rate: 60/min. Returns balance for an owned SIP account. 403 if the authusername isn't yours."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Destinations",
+          "item": [
+            {
+              "name": "Add Destination",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/destinations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "destinations"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"authusername\": \"123456\",\n  \"destination\": \"0245678901\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Auth (web token). Rate: 60/min. destination max 20 chars. 403 if SIP account isn't yours."
+              }
+            },
+            {
+              "name": "Delete Destination",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/destinations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "destinations"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"authusername\": \"123456\",\n  \"destination\": \"0245678901\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Auth (web token). Rate: 60/min. destination max 20 chars."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Payments",
+          "item": [
+            {
+              "name": "Get Payment Config",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/payments/config",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "payments", "config"]
+                },
+                "description": "Public. Returns the Paystack public key (never the secret)."
+              }
+            },
+            {
+              "name": "Initialize Payment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/payments/initialize",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "payments", "initialize"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"authusername\": \"123456\",\n  \"amount\": 100,\n  \"email\": \"john@example.com\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Auth (web token). Rate: 20/min. Initializes a Paystack transaction. `email` optional (falls back to subscriber profile). Paystack uses amount in kobo internally."
+              }
+            },
+            {
+              "name": "Verify Payment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/payments/verify",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "payments", "verify"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reference\": \"PAYSTACK_REFERENCE_ID\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "No auth required (Paystack is source of truth). Rate: 20/min. Verifies a Paystack reference and credits the account. Reference: alphanumeric, `_` and `-` only, max 128. Idempotent - reprocessing returns 'Payment already processed'."
+              }
+            },
+            {
+              "name": "Get Purchase History",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/purchase-history",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "purchase-history"]
+                },
+                "description": "Auth (web token). Rate: 60/min. Returns the subscriber's credit/purchase history."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Auth & Profile",
+          "item": [
+            {
+              "name": "Admin Login",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/login",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "login"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"adminpass\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Public. Rate: 5/min. Returns `token`. Use it to populate the `adminToken` variable for the /api/admin/* folder."
+              }
+            },
+            {
+              "name": "Get Dashboard",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/dashboard",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "dashboard"]
+                },
+                "description": "Admin auth (manager+). Rate: 60/min. Totals and recent subscribers/transactions."
+              }
+            },
+            {
+              "name": "Update Profile",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/profile",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "profile"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Admin User\",\n  \"email\": \"admin@example.com\",\n  \"password\": \"optionalnewpass\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Admin auth (manager+). Rate: 60/min. Update admin name/email/password."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Subscribers",
+          "item": [
+            {
+              "name": "List Subscribers",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/subscribers",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "subscribers"]
+                },
+                "description": "Admin auth (manager+). Rate: 60/min."
+              }
+            },
+            {
+              "name": "Get Subscriber",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/subscribers/:id",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "subscribers", ":id"]
+                },
+                "description": "Admin auth (manager+). Rate: 60/min. `id` is the subscriberid (e.g. SUB_XXXX)."
+              }
+            },
+            {
+              "name": "Create Subscriber",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/subscribers",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "subscribers"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"fullname\": \"Jane Doe\",\n  \"username\": \"janedoe\",\n  \"emailaddress\": \"jane@example.com\",\n  \"phonenumber\": \"0241112222\",\n  \"country\": \"Ghana\",\n  \"password\": \"password123\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Admin auth (manager+). Rate: 60/min."
+              }
+            },
+            {
+              "name": "Update Subscriber",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/subscribers/:id",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "subscribers", ":id"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"fullname\": \"Jane Q. Doe\",\n  \"switch_status\": \"active\",\n  \"billing_acc_status\": \"active\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Admin auth (manager+). Rate: 60/min. Partial update supported."
+              }
+            },
+            {
+              "name": "Delete Subscriber",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/subscribers/:id",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "subscribers", ":id"]
+                },
+                "description": "Admin auth (manager+). Rate: 60/min. Deletes subscriber + all related data (auth users, destinations, credits)."
+              }
+            }
+          ]
+        },
+        {
+          "name": "SIP Accounts (Auth Users)",
+          "item": [
+            {
+              "name": "List Auth Users",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/auth-users",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "auth-users"]
+                },
+                "description": "Admin auth (manager+). Rate: 60/min. Returns authusername + balance + status. Note: authpassword is NOT included (trimmed)."
+              }
+            },
+            {
+              "name": "Get Auth User",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/auth-users/:id",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "auth-users", ":id"]
+                },
+                "description": "Admin auth (manager+). Rate: 60/min. authpassword NOT included."
+              }
+            },
+            {
+              "name": "Create Auth User",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/auth-users",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "auth-users"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"subscriberid\": \"SUB_XXXX\",\n  \"authusername\": \"112233\",\n  \"authpassword\": \"optionalpass\",\n  \"status\": \"active\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Admin auth (manager+). Rate: 60/min. authpassword optional (auto-generated if omitted). Response includes generated password."
+              }
+            },
+            {
+              "name": "Update Auth User",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/auth-users/:id",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "auth-users", ":id"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"authpassword\": \"newpass12\",\n  \"status\": \"inactive\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Admin auth (manager+). Rate: 60/min."
+              }
+            },
+            {
+              "name": "Delete Auth User",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/auth-users/:id",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "auth-users", ":id"]
+                },
+                "description": "Admin auth (manager+). Rate: 60/min. Deletes the SIP account + related destinations + credits."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Destinations",
+          "item": [
+            {
+              "name": "List Destinations",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/destinations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "destinations"]
+                },
+                "description": "Admin auth (manager+). Rate: 60/min."
+              }
+            },
+            {
+              "name": "Get Destination",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/destinations/:id",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "destinations", ":id"]
+                },
+                "description": "Admin auth (manager+). Rate: 60/min."
+              }
+            },
+            {
+              "name": "Create Destination",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/destinations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "destinations"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"subscriberid\": \"SUB_XXXX\",\n  \"authusername\": \"112233\",\n  \"destination\": \"0245678901\",\n  \"status\": \"active\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Admin auth (manager+). Rate: 60/min. destination max 20 chars. 422 if the SIP account doesn't belong to the subscriber."
+              }
+            },
+            {
+              "name": "Update Destination",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/destinations/:id",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "destinations", ":id"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"destination\": \"0249999000\",\n  \"status\": \"inactive\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Admin auth (manager+). Rate: 60/min."
+              }
+            },
+            {
+              "name": "Delete Destination",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/destinations/:id",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "destinations", ":id"]
+                },
+                "description": "Admin auth (manager+). Rate: 60/min."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Credits",
+          "item": [
+            {
+              "name": "List Purchase History",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/purchase-history",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "purchase-history"]
+                },
+                "description": "Admin auth (manager+). Rate: 60/min. All prepaid credit transactions."
+              }
+            },
+            {
+              "name": "Add Credits",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/credits",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "credits"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"authusername\": \"112233\",\n  \"amount\": 50\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Admin auth (manager+). Rate: 60/min. Manually tops up a SIP account balance."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Super Admin",
+          "item": [
+            {
+              "name": "List Admins",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/admins",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "admins"]
+                },
+                "description": "Admin auth (super_admin only). Rate: 60/min."
+              }
+            },
+            {
+              "name": "Create Admin",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/admins",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "admins"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Manager One\",\n  \"username\": \"mgr1\",\n  \"email\": \"mgr1@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"manager\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Admin auth (super_admin only). Rate: 60/min. role in: super_admin, manager."
+              }
+            },
+            {
+              "name": "Delete Admin",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/admins/:id",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "admins", ":id"]
+                },
+                "description": "Admin auth (super_admin only). Rate: 60/min. Cannot delete the last super admin."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Mobile (Legacy v1)",
+      "item": [
+        {
+          "name": "Auth & Registration",
+          "item": [
+            {
+              "name": "Register",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/register",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "register"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"mob_user\",\n  \"password\": \"password123\",\n  \"phonenumber\": \"233201234567\",\n  \"fullname\": \"Mobile User\",\n  \"emailaddress\": \"mob@example.com\",\n  \"country\": \"Ghana\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Public. Rate: 5/min. CI envelope. Returns HTTP 200 on success (legacy behavior). "
+              }
+            },
+            {
+              "name": "Verify OTP",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/verify-otp",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "verify-otp"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"phonenumber\": \"233201234567\",\n  \"code\": \"123456\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Public. Rate: 5/min. Uses `code` (or `otp`). Envelope-shaped."
+              }
+            },
+            {
+              "name": "Regenerate OTP",
+              "request": {
+                "method": "GET",
+                "auth": { "type": "noauth" },
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/regenerate-otp/:email",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "regenerate-otp", ":email"]
+                },
+                "description": "Public. Rate: 5/min. GET with email in URL path. Validates email format."
+              }
+            },
+            {
+              "name": "Login",
+              "request": {
+                "auth": { "type": "noauth" },
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/login",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "login"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"mob_user\",\n  \"password\": \"password123\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Public. Rate: 5/min. Response `data.access_token` is used as Bearer for the rest of /api/v1/*. Also returns subscriber fields incl. authpassword (owner)."
+              }
+            },
+            {
+              "name": "Forgot Password",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/forgot-password",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "forgot-password"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"mob@example.com\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Public. Rate: 5/min. `emailaddress` alias accepted too."
+              }
+            },
+            {
+              "name": "Reset Password",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/reset-password",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "reset-password"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"token\": \"123456\",\n  \"password\": \"newpass123\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Public. Rate: 5/min. `password_reset_token`/`new_password` aliases accepted."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Subscriber & Contact Lists",
+          "item": [
+            {
+              "name": "Get Own Subscriber",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/subscriber",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "subscriber"]
+                },
+                "description": "Mobile auth (your mobileToken). Rate: 60/min. Own profile including authpassword."
+              }
+            },
+            {
+              "name": "User Subscribers (Legacy List)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/user/subscribers",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "user", "subscribers"]
+                },
+                "description": "Mobile auth. Rate: 60/min. Global subscriber list. authpassword NOT returned (trimmed)."
+              }
+            },
+            {
+              "name": "All Contacts",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/all-contacts",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "all-contacts"]
+                },
+                "description": "Mobile auth. Rate: 60/min. Global contact list. No authpassword."
+              }
+            },
+            {
+              "name": "Subscribers (v1 Index)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/subscribers",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "subscribers"]
+                },
+                "description": "Mobile auth. Rate: 60/min. Delegates to web index (name/email/phone/sipnumber)."
+              }
+            },
+            {
+              "name": "Voice Relays",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/voice-relays",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "voice-relays"]
+                },
+                "description": "Mobile auth. Rate: 60/min. Returns voice relay records."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Balance & Payments",
+          "item": [
+            {
+              "name": "Check Balance",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/check-balance",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "check-balance"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"authusername\": \"123456\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Mobile auth. Rate: 20/min. Returns the external booth response wrapped as data. 403 if SIP not owned."
+              }
+            },
+            {
+              "name": "Payment Link",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/payment-link",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "payment-link"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"authusername\": \"123456\",\n  \"amount\": 50\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Mobile auth. Rate: 20/min. Returns a deep link to the web checkout page prefilled with the owned SIP account and amount: `{status:true, code, data:{url}, message}`. The `url` points to `FRONTEND_URL/dashboard.html?buy=1&authusername=...&amount=...` - open it in a browser to complete the purchase on the web. 403 if the SIP account isn't owned."
+              }
+            },
+            {
+              "name": "Verify Payment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/verifypayment",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v1", "verifypayment"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reference\": \"PAYSTACK_REFERENCE_ID\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Mobile auth. Rate: 20/min. `referenceid` alias accepted (mapped to `reference`). Verifies a Paystack reference and credits the account."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -11,54 +11,18 @@ use App\Models\SubscribersModel;
 use App\Models\SubscriberAuthModel;
 use App\Models\SubscriberDestModel;
 use App\Models\PrepaidCredit;
+use App\Services\BoothApiService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
 class AdminController extends Controller
 {
-    private function callBoothApi(string $endpoint, array $params): ?\Illuminate\Http\Client\Response
+    private function booth(): BoothApiService
     {
-        $baseUrl = rtrim(env('BOOTH_API_BASE_URL', 'http://63.250.47.51/altfonapp'), '/');
-
-        try {
-            $response = Http::asForm()
-                ->timeout(10)
-                ->connectTimeout(5)
-                ->post("{$baseUrl}/{$endpoint}", $params);
-
-            if (!$response->successful()) {
-                \Log::warning('Admin Booth API request failed', [
-                    'endpoint' => $endpoint,
-                    'params' => $params,
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
-            }
-
-            return $response;
-        } catch (\Exception $e) {
-            \Log::error('Admin Booth API request exception', [
-                'endpoint' => $endpoint,
-                'params' => $params,
-                'error' => $e->getMessage(),
-            ]);
-            return null;
-        }
-    }
-
-    private function extractBalanceFromResponse(?\Illuminate\Http\Client\Response $response): ?float
-    {
-        if (!$response) return null;
-
-        $body = json_decode(trim($response->body()), true);
-
-        if (json_last_error() !== JSON_ERROR_NONE) return null;
-
-        return $body['balance'] ?? null;
+        return app(BoothApiService::class);
     }
 
     public function login(Request $request): JsonResponse
@@ -232,16 +196,13 @@ class AdminController extends Controller
         $auths = SubscriberAuthModel::all();
 
         $result = $auths->map(function ($auth) {
-            $response = $this->callBoothApi('booth_getbal.php', [
-                'accesscode' => $auth->authusername,
-            ]);
+            $response = $this->booth()->getBalance($auth->authusername);
 
             return [
                 'id' => $auth->id,
                 'subscriberid' => $auth->subscriberid,
                 'authusername' => $auth->authusername,
-                'authpassword' => $auth->authpassword,
-                'balance' => $this->extractBalanceFromResponse($response) ?? 0.00,
+                'balance' => $this->booth()->extractBalance($response) ?? 0.00,
                 'status' => $auth->status,
                 'created_at' => $auth->created_at,
                 'updated_at' => $auth->updated_at,
@@ -258,16 +219,13 @@ class AdminController extends Controller
             return response()->json(['message' => 'SIP account not found'], 404);
         }
 
-        $response = $this->callBoothApi('booth_getbal.php', [
-            'accesscode' => $auth->authusername,
-        ]);
+        $response = $this->booth()->getBalance($auth->authusername);
 
         return response()->json(['data' => [
             'id' => $auth->id,
             'subscriberid' => $auth->subscriberid,
             'authusername' => $auth->authusername,
-            'authpassword' => $auth->authpassword,
-            'balance' => $this->extractBalanceFromResponse($response) ?? 0.00,
+            'balance' => $this->booth()->extractBalance($response) ?? 0.00,
             'status' => $auth->status,
             'created_at' => $auth->created_at,
             'updated_at' => $auth->updated_at,
@@ -366,7 +324,7 @@ class AdminController extends Controller
         $request->validate([
             'subscriberid' => 'required|exists:subscribers,subscriberid',
             'authusername' => 'required|exists:subscriber_auth,authusername',
-            'destination' => 'required|string',
+            'destination' => 'required|string|max:20',
             'status' => 'nullable|string|in:active,inactive',
         ]);
 
@@ -385,7 +343,7 @@ class AdminController extends Controller
             'status' => $request->status ?? 'active',
         ]);
 
-        $this->callBoothApi('booth_add_dest.php', [
+        $this->booth()->addDest([
             'accesscode' => $request->authusername,
             'destination' => $request->destination,
         ]);
@@ -405,7 +363,7 @@ class AdminController extends Controller
         }
 
         $request->validate([
-            'destination' => 'sometimes|string',
+            'destination' => 'sometimes|string|max:20',
             'status' => 'nullable|string|in:active,inactive',
         ]);
 
@@ -426,7 +384,7 @@ class AdminController extends Controller
             return response()->json(['message' => 'Destination not found'], 404);
         }
 
-        $this->callBoothApi('booth_del_dest.php', [
+        $this->booth()->delDest([
             'accesscode' => $dest->authusername,
             'destination' => $dest->destination,
         ]);
@@ -458,19 +416,14 @@ class AdminController extends Controller
             'status' => 'completed',
         ]);
 
-        $this->callBoothApi('booth_topup.php', [
-            'accesscode' => $request->authusername,
-            'amount' => $request->amount,
-        ]);
+        $this->booth()->topup($request->authusername, $request->amount);
 
-        $externalBalance = $this->callBoothApi('booth_getbal.php', [
-            'accesscode' => $request->authusername,
-        ]);
+        $externalBalance = $this->booth()->getBalance($request->authusername);
 
         return response()->json([
             'status' => true,
             'message' => 'Credits added successfully',
-            'balance' => $this->extractBalanceFromResponse($externalBalance) ?? 'N/A',
+            'balance' => $this->booth()->extractBalance($externalBalance) ?? 'N/A',
             'transaction_id' => $transactionId,
         ], 201);
     }

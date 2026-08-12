@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\SubscribersModel;
-use App\Models\SubscriberTempModel;
+use App\Models\SubscribersTempModel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
@@ -46,7 +46,10 @@ class AuthTest extends TestCase
      */
     public function test_subscriber_can_verify_otp(): void
     {
-        $temp = SubscriberTempModel::create([
+        Http::fake();
+        Mail::fake();
+
+        $temp = SubscribersTempModel::create([
             'subscriberid' => 'TEMP_12345',
             'fullname' => 'Verify User',
             'username' => 'verifyuser',
@@ -55,6 +58,7 @@ class AuthTest extends TestCase
             'emailaddress' => 'verify@example.com',
             'country' => 'Ghana',
             'otp' => '123456',
+            'otp_expiration' => now()->addMinutes(10),
             'status' => 'pending',
         ]);
 
@@ -70,8 +74,14 @@ class AuthTest extends TestCase
             'username' => 'verifyuser'
         ]);
 
+        $subscriber = SubscribersModel::where('username', 'verifyuser')->first();
+
+        $this->assertDatabaseHas('subscriber_auth', [
+            'subscriberid' => $subscriber->subscriberid,
+        ]);
+
         $this->assertDatabaseMissing('subscribers_temp', [
-            'id' => $temp->id
+            'recid' => $temp->recid
         ]);
     }
 

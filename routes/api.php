@@ -28,7 +28,7 @@ Route::middleware(['auth:api', 'throttle:60,1'])->group(function () {
 
     // Management Routes (CAUTION: These are currently accessible to any authenticated subscriber)
     // TODO: Implement Admin middleware/role check
-    Route::get('/subscribers', [SubscribersController::class, 'index']);
+    Route::get('/subscribers', [SubscribersController::class, 'adminIndex']);
     Route::get('/subscribers/{id}', [SubscribersController::class, 'show']);
 
     // Auth User Management
@@ -43,7 +43,6 @@ Route::middleware(['auth:api', 'throttle:60,1'])->group(function () {
 
     // Credits & Payments (auth required)
     Route::middleware('throttle:20,1')->group(function () {
-        Route::post('/purchase-credits', [SubscribersController::class, 'purchaseCredits']);
         Route::post('/payments/initialize', [SubscribersController::class, 'initializePayment']);
     });
     Route::get('/purchase-history', [SubscribersController::class, 'getPurchaseHistory']);

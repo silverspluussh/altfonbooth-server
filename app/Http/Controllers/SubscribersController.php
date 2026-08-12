@@ -8,6 +8,8 @@ use App\Models\PrepaidCredit;
 use App\Models\SubscriberAuthModel;
 use App\Models\SubscriberDestModel;
 use App\Models\SubscribersModel;
+use App\Models\VoiceRelay;
+use App\Services\BoothApiService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -16,49 +18,64 @@ use Illuminate\Support\Str;
 
 class SubscribersController extends Controller
 {
-    private function callBoothApi(string $endpoint, array $params): ?\Illuminate\Http\Client\Response
+    private function booth(): BoothApiService
     {
-        $baseUrl = rtrim(env('BOOTH_API_BASE_URL', 'http://63.250.47.51/altfonapp'), '/');
-
-        try {
-            $response = Http::asForm()
-                ->timeout(10)
-                ->connectTimeout(5)
-                ->post("{$baseUrl}/{$endpoint}", $params);
-
-            if (!$response->successful()) {
-                \Log::warning('Booth API request failed', [
-                    'endpoint' => $endpoint,
-                    'params' => $params,
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
-            }
-
-            return $response;
-        } catch (\Exception $e) {
-            \Log::error('Booth API request exception', [
-                'endpoint' => $endpoint,
-                'params' => $params,
-                'error' => $e->getMessage(),
-            ]);
-            return null;
-        }
+        return app(BoothApiService::class);
     }
 
-    private function extractBalanceFromResponse(?\Illuminate\Http\Client\Response $response): ?float
+    private function splitFullname(string $fullname): array
     {
-        if (!$response) return null;
+        $parts = preg_split('/\s+/', trim($fullname), 2);
 
-        $body = json_decode(trim($response->body()), true);
-
-        if (json_last_error() !== JSON_ERROR_NONE) return null;
-
-        return $body['balance'] ?? null;
+        return [$parts[0] ?? '', $parts[1] ?? ''];
     }
 
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
+    {
+        $subscribers = SubscribersModel::all();
+
+        $data = $subscribers->map(function ($subscriber) {
+            [$firstname, $lastname] = $this->splitFullname((string) $subscriber->fullname);
+
+            return [
+                'name' => ucwords(trim("$firstname $lastname")),
+                'emailaddress' => $subscriber->emailaddress,
+                'phonenumber' => $subscriber->phonenumber,
+                'sipnumber' => $subscriber->authusername,
+            ];
+        });
+
+        return response()->json(['status' => true, 'data' => $data]);
+    }
+
+    public function allContacts(Request $request): JsonResponse
+    {
+        $contacts = SubscribersModel::all();
+
+        $data = $contacts->map(function ($subscriber) {
+            [$firstname, $lastname] = $this->splitFullname((string) $subscriber->fullname);
+
+            return [
+                'firstname' => $firstname,
+                'lastname' => $lastname,
+                'emailaddress' => $subscriber->emailaddress,
+                'phonenumber' => $subscriber->phonenumber,
+                'authusername' => $subscriber->authusername,
+            ];
+        });
+
+        return response()->json(['status' => true, 'data' => $data]);
+    }
+
+    public function voiceRelays(Request $request): JsonResponse
+    {
+        $relays = VoiceRelay::all();
+
+        return response()->json(['status' => true, 'data' => $relays]);
+    }
+
+    public function adminIndex(): JsonResponse
     {
         // Protected: Only admins should see the full list. 
         // For now, we return empty or unauthorized to prevent data leaks.
@@ -177,16 +194,14 @@ class SubscribersController extends Controller
         $auths = SubscriberAuthModel::where('subscriberid', $subscriber->subscriberid)->get();
 
         $result = $auths->map(function ($auth) {
-            $response = $this->callBoothApi('booth_getbal.php', [
-                'accesscode' => $auth->authusername,
-            ]);
+            $response = $this->booth()->getBalance($auth->authusername);
 
             return [
                 'id' => $auth->id,
                 'subscriberid' => $auth->subscriberid,
                 'authusername' => $auth->authusername,
                 'authpassword' => $auth->authpassword,
-                'balance' => $this->extractBalanceFromResponse($response) ?? 0.00,
+                'balance' => $this->booth()->extractBalance($response) ?? 0.00,
                 'status' => $auth->status,
                 'created_at' => $auth->created_at,
                 'updated_at' => $auth->updated_at,
@@ -274,7 +289,7 @@ class SubscribersController extends Controller
     {
         $request->validate([
             'authusername' => 'required|regex:/^\d+$/',
-            'destination' => 'required|string',
+            'destination' => 'required|string|max:20',
         ]);
 
         $subscriber = $request->user();
@@ -295,7 +310,7 @@ class SubscribersController extends Controller
             'status' => 'active'
         ]);
 
-        $this->callBoothApi('booth_add_dest.php', [
+        $this->booth()->addDest([
             'accesscode' => $request->authusername,
             'destination' => $request->destination,
         ]);
@@ -317,7 +332,7 @@ class SubscribersController extends Controller
     {
         $request->validate([
             'authusername' => 'required|regex:/^\d+$/',
-            'destination' => 'required|string',
+            'destination' => 'required|string|max:20',
         ]);
 
         $subscriber = $request->user();
@@ -327,7 +342,7 @@ class SubscribersController extends Controller
             ->where('destination', $request->destination)
             ->delete();
 
-        $this->callBoothApi('booth_del_dest.php', [
+        $this->booth()->delDest([
             'accesscode' => $request->authusername,
             'destination' => $request->destination,
         ]);
@@ -352,50 +367,6 @@ class SubscribersController extends Controller
             'status' => true,
             'count' => count($list),
             'destinations' => SubscriberDestResource::collection($list)
-        ]);
-    }
-
-    public function purchaseCredits(Request $request): JsonResponse
-    {
-        $request->validate([
-            'authusername' => 'required|exists:subscriber_auth,authusername',
-            'amount' => 'required|numeric|min:1',
-        ]);
-
-        $subscriber = $request->user();
-        
-        // Ensure the authusername belongs to the current subscriber
-        $auth = SubscriberAuthModel::where('authusername', $request->authusername)
-            ->where('subscriberid', $subscriber->subscriberid)
-            ->first();
-
-        if (!$auth) {
-            return response()->json(['status' => false, 'message' => 'SIP account not found or unauthorized'], 404);
-        }
-
-        $transactionId = 'TXN_' . strtoupper(Str::random(12));
-
-        $credit = PrepaidCredit::create([
-            'authusername' => $request->authusername,
-            'amount' => $request->amount,
-            'transaction_id' => $transactionId,
-            'status' => 'completed'
-        ]);
-
-        $this->callBoothApi('booth_topup.php', [
-            'accesscode' => $request->authusername,
-            'amount' => $request->amount,
-        ]);
-
-        $externalBalance = $this->callBoothApi('booth_getbal.php', [
-            'accesscode' => $request->authusername,
-        ]);
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Credits purchased successfully',
-            'balance' => $this->extractBalanceFromResponse($externalBalance) ?? 'N/A',
-            'transaction_id' => $transactionId
         ]);
     }
 
@@ -495,7 +466,7 @@ class SubscribersController extends Controller
     public function verifyPayment(Request $request): JsonResponse
     {
         $request->validate([
-            'reference' => 'required|string',
+            'reference' => 'required|string|max:128|regex:/^[a-zA-Z0-9_-]+$/',
         ]);
 
         $secretKey = config('services.paystack.secret_key');
@@ -554,14 +525,12 @@ class SubscribersController extends Controller
                 if ($existing) {
                     \Log::info('Payment already processed', ['reference' => $request->reference]);
 
-                    $externalBalance = $this->callBoothApi('booth_getbal.php', [
-                        'accesscode' => $authusername,
-                    ]);
+                    $externalBalance = $this->booth()->getBalance($authusername);
 
                     return response()->json([
                         'status' => true,
                         'message' => 'Payment already processed',
-                        'balance' => $this->extractBalanceFromResponse($externalBalance) ?? 'N/A',
+                        'balance' => $this->booth()->extractBalance($externalBalance) ?? 'N/A',
                         'transaction_id' => $request->reference
                     ]);
                 }
@@ -574,14 +543,9 @@ class SubscribersController extends Controller
                     'status' => 'completed'
                 ]);
 
-                $this->callBoothApi('booth_topup.php', [
-                    'accesscode' => $authusername,
-                    'amount' => $amount,
-                ]);
+                $this->booth()->topup($authusername, $amount);
 
-                $externalBalance = $this->callBoothApi('booth_getbal.php', [
-                    'accesscode' => $authusername,
-                ]);
+                $externalBalance = $this->booth()->getBalance($authusername);
 
                 \Log::info('Payment verified and account credited', [
                     'authusername' => $authusername,
@@ -592,7 +556,7 @@ class SubscribersController extends Controller
                 return response()->json([
                     'status' => true,
                     'message' => 'Payment verified and account credited',
-                    'balance' => $this->extractBalanceFromResponse($externalBalance) ?? 'N/A',
+                    'balance' => $this->booth()->extractBalance($externalBalance) ?? 'N/A',
                     'transaction_id' => $request->reference
                 ]);
             }
@@ -639,7 +603,7 @@ class SubscribersController extends Controller
     {
         return response()->json([
             'status' => true,
-            'paystack_public_key' => ''
+            'paystack_public_key' => config('services.paystack.public_key'),
         ]);
     }
 
@@ -659,13 +623,11 @@ class SubscribersController extends Controller
             return response()->json(['status' => false, 'message' => 'Unauthorized: This SIP account does not belong to you.'], 403);
         }
 
-        $response = $this->callBoothApi('booth_getbal.php', [
-            'accesscode' => $request->authusername,
-        ]);
+        $response = $this->booth()->getBalance($request->authusername);
 
         return response()->json([
             'status' => true,
-            'balance' => $this->extractBalanceFromResponse($response) ?? 'N/A',
+            'balance' => $this->booth()->extractBalance($response) ?? 'N/A',
         ]);
     }
 }

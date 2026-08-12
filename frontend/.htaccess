@@ -16,5 +16,8 @@ RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME}\.html -f
 RewriteRule ^([^\.]+)$ $1.html [NC,L]
 
-# 3. Handle root/homepage
+# 3. Explicit admin route
+RewriteRule ^admin$ admin.html [L]
+
+# 4. Handle root/homepage
 DirectoryIndex index.html

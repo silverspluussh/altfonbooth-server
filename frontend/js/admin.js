@@ -166,7 +166,9 @@ function showConfirm(message, onConfirm) {
     }, 'Confirm');
 }
 
-// ---- TABLE HELPER ----
+// ---- TABLE HELPERS ----
+const _tables = {};
+
 function createTable(data, columns, actions = null) {
     if (!data || data.length === 0) {
         return '<p class="empty-state">No records found.</p>';
@@ -197,10 +199,67 @@ function createTable(data, columns, actions = null) {
     return html;
 }
 
+function renderPaginationControls(tableId, totalPages, currentPage) {
+    if (totalPages <= 1) return '';
+    let html = '<div class="pagination">';
+    html += `<button class="btn btn-sm btn-outline page-btn" onclick="navigatePage('${tableId}', ${currentPage - 1})" ${currentPage <= 1 ? 'disabled' : ''}><i class="fa fa-chevron-left"></i> Prev</button>`;
+    for (let i = 1; i <= totalPages; i++) {
+        if (totalPages > 7 && i > 2 && i < totalPages - 1) {
+            if (i === 3) html += '<span class="page-dots">...</span>';
+            continue;
+        }
+        html += `<button class="btn btn-sm ${i === currentPage ? 'btn-primary' : 'btn-outline'} page-btn" onclick="navigatePage('${tableId}', ${i})">${i}</button>`;
+    }
+    if (totalPages > 7) {
+        html += `<span class="page-dots">...</span>`;
+        html += `<button class="btn btn-sm btn-outline page-btn" onclick="navigatePage('${tableId}', ${totalPages})">${totalPages}</button>`;
+    }
+    html += `<button class="btn btn-sm btn-outline page-btn" onclick="navigatePage('${tableId}', ${currentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>Next <i class="fa fa-chevron-right"></i></button>`;
+    html += `<span class="page-info">Page ${currentPage} of ${totalPages}</span>`;
+    html += '</div>';
+    return html;
+}
+
+function navigatePage(tableId, page) {
+    const t = _tables[tableId];
+    if (!t) return;
+    if (page < 1 || page > t.totalPages) return;
+    t.currentPage = page;
+    renderTablePage(tableId);
+}
+
+function renderTablePage(tableId) {
+    const t = _tables[tableId];
+    if (!t) return;
+    const start = (t.currentPage - 1) * t.perPage;
+    const end = start + t.perPage;
+    const pageData = t.data.slice(start, end);
+    const container = document.getElementById(t.containerId);
+    if (!container) return;
+    container.innerHTML = createTable(pageData, t.columns, t.actions) + renderPaginationControls(tableId, t.totalPages, t.currentPage);
+}
+
+function initPaginatedTable(tableId, containerId, data, columns, actions, perPage = 15) {
+    _tables[tableId] = {
+        containerId, data, columns, actions, perPage,
+        currentPage: 1,
+        get totalPages() { return Math.ceil(this.data.length / this.perPage) || 1; }
+    };
+    renderTablePage(tableId);
+}
+
+function updatePaginatedTable(tableId, data) {
+    const t = _tables[tableId];
+    if (!t) return;
+    t.data = data;
+    t.currentPage = 1;
+    renderTablePage(tableId);
+}
+
 function createStatCards(cards) {
     return cards.map(c => `
-        <div class="stat-card">
-            <div class="stat-icon" style="background:${c.color}15; color:${c.color}">${c.icon}</div>
+        <div class="stat-card" style="border-left: 4px solid ${c.color};">
+            <div class="stat-icon" style="background:${c.bg}; color:${c.color}"><i class="fa ${c.icon}"></i></div>
             <div class="stat-info">
                 <p>${c.label}</p>
                 <h3>${c.value}</h3>
@@ -224,7 +283,7 @@ function renderLogin() {
 // ---- DASHBOARD ----
 async function renderDashboard() {
     const container = document.getElementById('app-content');
-    container.innerHTML = '<h2>Dashboard</h2><div id="dashboard-content"></div>';
+    container.innerHTML = '<div class="page-header"><h2><i class="fa fa-dashboard"></i> Dashboard</h2></div><div id="dashboard-content"></div>';
     showLoading('dashboard-content');
 
     try {
@@ -234,22 +293,18 @@ async function renderDashboard() {
         document.getElementById('dashboard-content').innerHTML = `
             <div class="stat-grid">
                 ${createStatCards([
-                    { label: 'Subscribers', value: d.total_subscribers, icon: '&#128101;', color: '#010a4c' },
-                    { label: 'SIP Accounts', value: d.total_auth_users, icon: '&#128279;', color: '#2563eb' },
-                    { label: 'Destinations', value: d.total_destinations, icon: '&#128205;', color: '#059669' },
-                    { label: 'Total Credits (GH₵)', value: Number(d.total_credits_amount).toFixed(2), icon: '&#128176;', color: '#d97706' },
-                    { label: 'Transactions', value: d.total_transactions, icon: '&#128203;', color: '#7c3aed' },
+                    { label: 'Subscribers', value: d.total_subscribers, icon: 'fa-users', color: '#010a4c', bg: '#eef2ff' },
+                    { label: 'SIP Accounts', value: d.total_auth_users, icon: 'fa-phone', color: '#2563eb', bg: '#eff6ff' },
+                    { label: 'Destinations', value: d.total_destinations, icon: 'fa-map-marker', color: '#059669', bg: '#ecfdf5' },
+                    { label: 'Total Credits', value: `GH₵ ${Number(d.total_credits_amount).toFixed(2)}`, icon: 'fa-credit-card', color: '#d97706', bg: '#fffbeb' },
                 ])}
             </div>
-            <div class="dashboard-grid">
-                <div class="card">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fa fa-users" style="color:var(--primary);font-size:1.1rem;"></i>
                     <h3>Recent Subscribers</h3>
-                    <div id="recent-subs">${renderRecentSubs(d.recent_subscribers)}</div>
                 </div>
-                <div class="card">
-                    <h3>Recent Transactions</h3>
-                    <div id="recent-txns">${renderRecentTxns(d.recent_transactions)}</div>
-                </div>
+                <div id="recent-subs">${renderRecentSubs(d.recent_subscribers)}</div>
             </div>
         `;
     } catch (e) {
@@ -308,11 +363,11 @@ function filterSubscribers() {
         (s.username || '').toLowerCase().includes(q) ||
         (s.subscriberid || '').toLowerCase().includes(q)
     );
-    renderSubscribersTable(filtered);
+    updatePaginatedTable('subs-table', filtered);
 }
 
 function renderSubscribersTable(list) {
-    document.getElementById('subs-content').innerHTML = createTable(list, [
+    initPaginatedTable('subs-table', 'subs-content', list, [
         { label: 'ID', render: s => `<code>${UI.esc(s.subscriberid)}</code>` },
         { label: 'Name', key: 'fullname' },
         { label: 'Email', key: 'emailaddress' },
@@ -400,7 +455,7 @@ async function loadAuthUsers() {
 }
 
 function renderAuthUsersTable(list) {
-    document.getElementById('auth-users-content').innerHTML = createTable(list, [
+    initPaginatedTable('auth-table', 'auth-users-content', list, [
         { label: 'ID', key: 'id' },
         { label: 'Subscriber ID', key: 'subscriberid' },
         { label: 'SIP Number', key: 'authusername' },
@@ -529,7 +584,7 @@ async function loadDestinations() {
 }
 
 function renderDestinationsTable(list) {
-    document.getElementById('dests-content').innerHTML = createTable(list, [
+    initPaginatedTable('dests-table', 'dests-content', list, [
         { label: 'ID', key: 'id' },
         { label: 'Subscriber', key: 'subscriberid' },
         { label: 'SIP', key: 'authusername' },
@@ -612,11 +667,11 @@ async function loadPurchaseHistory() {
     try {
         const res = await adminApiRequest('/admin/purchase-history');
         const data = res.data || [];
-        document.getElementById('purchase-content').innerHTML = createTable(data, [
+        initPaginatedTable('purchase-table', 'purchase-content', data, [
             { label: 'ID', key: 'id' },
             { label: 'SIP', key: 'authusername' },
             { label: 'Amount (GH₵)', render: t => Number(t.amount).toFixed(4) },
-            { label: 'Transaction ID', key: 'transaction_id' },
+            { label: 'Transaction ID', render: t => `<code>${UI.esc(t.transaction_id)}</code>` },
             { label: 'Status', render: t => `<span class="badge badge-${t.status === 'completed' ? 'success' : 'warning'}">${UI.esc(t.status)}</span>` },
             { label: 'Date', render: t => t.created_at ? new Date(t.created_at).toLocaleString() : '' },
         ]);
@@ -665,7 +720,7 @@ async function loadAdmins() {
     try {
         const res = await adminApiRequest('/admin/admins');
         const data = res.data || res || [];
-        document.getElementById('admins-content').innerHTML = createTable(data, [
+        initPaginatedTable('admins-table', 'admins-content', data, [
             { label: 'ID', key: 'id' },
             { label: 'Name', key: 'name' },
             { label: 'Username', key: 'username' },
@@ -674,7 +729,7 @@ async function loadAdmins() {
             { label: 'Created', render: a => a.created_at ? new Date(a.created_at).toLocaleDateString() : '' },
         ], [
             { label: 'Delete', style: 'danger', handler: (row) => confirmDeleteAdmin(row) },
-        ]);
+        ], 10);
     } catch (e) {
         document.getElementById('admins-content').innerHTML = `<p class="error-state">${e.message}</p>`;
     }
@@ -726,17 +781,40 @@ async function renderSettings() {
     const user = AdminAuth.getUser();
     const container = document.getElementById('app-content');
     container.innerHTML = `
-        <h2>Settings</h2>
-        <div class="card" style="max-width: 500px;">
-            <form id="settings-form">
-                <label>Name</label>
-                <input name="name" value="${UI.esc(user?.name || '')}">
-                <label>Email</label>
-                <input name="email" type="email" value="${UI.esc(user?.email || '')}">
-                <label>New Password (leave blank to keep current)</label>
-                <input name="password" type="password">
-                <button type="submit" class="btn btn-primary">Save Changes</button>
-            </form>
+        <div class="page-header">
+            <h2><i class="fa fa-cog"></i> Settings</h2>
+        </div>
+        <div class="settings-layout">
+            <div class="card settings-profile">
+                <div class="settings-avatar">
+                    <i class="fa fa-user-circle"></i>
+                </div>
+                <h3>${UI.esc(user?.name || 'Admin')}</h3>
+                <p class="settings-username">@${UI.esc(user?.username || '')}</p>
+                <span class="badge badge-${user?.role === 'super_admin' ? 'warning' : 'primary'} settings-role">${UI.esc(user?.role || '')}</span>
+            </div>
+            <div class="card settings-form-card">
+                <h3><i class="fa fa-edit"></i> Edit Profile</h3>
+                <p class="settings-subtitle">Update your name, email, or password</p>
+                <form id="settings-form">
+                    <div class="form-group">
+                        <label><i class="fa fa-user"></i> Full Name</label>
+                        <input name="name" value="${UI.esc(user?.name || '')}" placeholder="Enter your name">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fa fa-envelope"></i> Email Address</label>
+                        <input name="email" type="email" value="${UI.esc(user?.email || '')}" placeholder="Enter your email">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fa fa-lock"></i> New Password</label>
+                        <input name="password" type="password" placeholder="Leave blank to keep current">
+                    </div>
+                    <div class="form-actions">
+                        <button type="reset" class="btn btn-outline" onclick="renderSettings()">Reset</button>
+                        <button type="submit" class="btn btn-primary"><i class="fa fa-check"></i> Save Changes</button>
+                    </div>
+                </form>
+            </div>
         </div>
     `;
 
@@ -746,18 +824,19 @@ async function renderSettings() {
         if (!data.password) delete data.password;
         const btn = e.target.querySelector('button[type="submit"]');
         btn.disabled = true;
-        btn.textContent = 'Saving...';
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...';
         try {
             const res = await adminApiRequest('/admin/profile', {
                 method: 'PUT', body: JSON.stringify(data)
             });
             if (res.data) AdminAuth.setUser(res.data);
-            UI.showToast('Profile updated');
+            UI.showToast('Profile updated successfully');
+            renderSettings();
         } catch (err) {
             UI.showToast(err.message, 'error');
         } finally {
             btn.disabled = false;
-            btn.textContent = 'Save Changes';
+            btn.innerHTML = '<i class="fa fa-check"></i> Save Changes';
         }
     });
 }
@@ -793,12 +872,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Logout button
+    // Logout button with confirm dialog
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            AdminAuth.logout();
+            showConfirm('Are you sure you want to logout?', async () => {
+                AdminAuth.logout();
+            });
         });
     }
 

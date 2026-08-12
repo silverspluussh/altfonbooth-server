@@ -18,6 +18,12 @@ return [
 
     'paystack' => [
         'secret_key' => env('PAYSTACK_SECRET_KEY'),
+        'public_key' => env('PAYSTACK_PUBLIC_KEY', ''),
+    ],
+
+    'booth' => [
+        'base_url' => env('BOOTH_API_BASE_URL', 'http://63.250.47.51/altfonapp'),
+        'provision_url' => env('BOOTH_PROVISION_URL', env('BOOTH_API_BASE_URL', 'http://63.250.47.51/altfonapp') . '/passjson.php'),
     ],
 
 ];

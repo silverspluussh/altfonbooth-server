@@ -22,7 +22,7 @@ class HelperTest extends TestCase
 
         Http::assertSent(function ($request) {
             return $request->url() == "https://api.mnotify.com/api/sms/quick?key=" . config('services.mnotify.key') &&
-                   $request['recipient'] == '0240000000';
+                   $request['recipient'] == ['233240000000'];
         });
 
         $this->assertNotFalse($result);
