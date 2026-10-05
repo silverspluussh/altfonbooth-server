@@ -18,4 +18,11 @@ class VoiceRelay extends Model
         'protocol',
         'outboundproxy',
     ];
+
+    protected $appends = ['id'];
+
+    public function getIdAttribute(): ?string
+    {
+        return $this->recid !== null ? (string) $this->recid : null;
+    }
 }
