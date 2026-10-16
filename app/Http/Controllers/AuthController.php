@@ -238,19 +238,26 @@ class AuthController extends Controller
     public function requestPasswordReset(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email',
+            'phonenumber' => 'required_without:emailaddress,email|string|max:20',
+            'emailaddress' => 'required_without:phonenumber|nullable|email|max:180',
+            'email' => 'required_without:phonenumber|nullable|email|max:180',
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['status' => false, 'message' => 'Email required'], 400);
+            return response()->json(['status' => false, 'message' => 'Phone number required'], 400);
         }
 
-        $email = $request->input('email') ?? $request->input('emailaddress');
+        $subscriber = null;
 
-        $subscriber = SubscribersModel::where('emailaddress', $email)->first();
+        if ($request->filled('phonenumber')) {
+            $subscriber = SubscribersModel::where('phonenumber', $request->phonenumber)->first();
+        } else {
+            $email = $request->input('email') ?? $request->input('emailaddress');
+            $subscriber = SubscribersModel::where('emailaddress', $email)->first();
+        }
 
         if (!$subscriber) {
-            return response()->json(['status' => false, 'message' => 'Email not found'], 404);
+            return response()->json(['status' => false, 'message' => 'Account not found'], 404);
         }
 
         $token = sprintf('%06d', random_int(0, 999999));

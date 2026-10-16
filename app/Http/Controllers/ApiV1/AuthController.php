@@ -42,6 +42,16 @@ class AuthController
             return $response;
         }
 
+        // Registration still pending: login re-issued an OTP instead of a token.
+        // Forward that branch so clients can prompt for verification.
+        if (!isset($payload['token']) || !isset($payload['user'])) {
+            return response()->json([
+                'status' => true,
+                'message' => $payload['message'] ?? 'A new OTP has been sent to your sms and email successfully',
+                'data' => $payload['data'] ?? [],
+            ]);
+        }
+
         $user = $payload['user'] ?? [];
         [$firstname, $lastname] = $this->splitFullname($user['fullname'] ?? '');
 

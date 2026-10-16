@@ -102,6 +102,75 @@ class ApiV1Test extends TestCase
                  ->assertJsonMissingPath('data.debug_otp');
     }
 
+    public function test_v1_login_pending_registration_returns_otp_branch(): void
+    {
+        Http::fake();
+        Mail::fake();
+
+        SubscribersTempModel::create([
+            'subscriberid' => 'TEMP_V1PEND',
+            'fullname' => 'Pending V1',
+            'username' => 'pv1',
+            'password' => bcrypt('password123'),
+            'phonenumber' => '0201234567',
+            'emailaddress' => 'pv1@example.com',
+            'country' => 'Ghana',
+            'otp' => '111111',
+            'otp_expiration' => now()->addMinutes(10),
+            'status' => 'pending',
+        ]);
+
+        $response = $this->postJson('/api/v1/login', [
+            'emailaddress' => 'pv1@example.com',
+            'password' => 'password123',
+        ]);
+
+        $response->assertStatus(200)
+                 ->assertJson(['status' => true])
+                 ->assertJsonStructure(['status', 'code', 'data' => ['otp_code'], 'message'])
+                 ->assertJsonMissingPath('data.access_token');
+    }
+
+    public function test_v1_forgot_password_accepts_phone_number(): void
+    {
+        Http::fake();
+        Mail::fake();
+
+        SubscribersModel::create([
+            'subscriberid' => 'SUB_V1RESET',
+            'fullname' => 'Reset V1',
+            'username' => 'rs1',
+            'password' => bcrypt('password123'),
+            'phonenumber' => '0205550000',
+            'emailaddress' => 'rs1@example.com',
+            'country' => 'Ghana',
+        ]);
+
+        $response = $this->postJson('/api/v1/forgot-password', [
+            'phonenumber' => '0205550000',
+        ]);
+
+        $response->assertStatus(200)
+                 ->assertJson(['status' => true]);
+
+        $this->assertNotNull(
+            SubscribersModel::where('phonenumber', '0205550000')->value('password_reset_token')
+        );
+    }
+
+    public function test_v1_forgot_password_unknown_phone_returns_404(): void
+    {
+        Http::fake();
+        Mail::fake();
+
+        $response = $this->postJson('/api/v1/forgot-password', [
+            'phonenumber' => '0200000000',
+        ]);
+
+        $response->assertStatus(404)
+                 ->assertJson(['status' => false]);
+    }
+
     public function test_v1_protected_route_rejects_missing_token_with_legacy_envelope(): void
     {
         $response = $this->getJson('/api/v1/subscriber');
