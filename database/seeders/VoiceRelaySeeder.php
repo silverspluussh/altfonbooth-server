@@ -9,19 +9,22 @@ class VoiceRelaySeeder extends Seeder
 {
     public function run(): void
     {
+        $relay = [
+            'domain' => 'ghana.altfon.net',
+            'port' => '5060',
+            'protocol' => 'udp',
+            'outboundproxy' => '203.161.38.171',
+            'updated_at' => now(),
+        ];
+
         if (DB::table('voice_relay')->exists()) {
+            DB::table('voice_relay')->update($relay);
+
             return;
         }
 
         DB::table('voice_relay')->insert([
-            [
-                'domain' => '192.168.1.10',
-                'port' => '443',
-                'protocol' => 'ws',
-                'outboundproxy' => '192.168.1.11',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
+            $relay + ['created_at' => now()],
         ]);
     }
 }
