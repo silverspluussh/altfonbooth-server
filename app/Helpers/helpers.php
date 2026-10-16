@@ -14,11 +14,14 @@ if (!function_exists('send_sms_mnotify')) {
         }
 
         try {
-            $response = \Illuminate\Support\Facades\Http::acceptJson()->post("https://api.mnotify.com/api/sms/quick?key={$apiKey}", [
-                'recipient' => [$to],
-                'sender' => $sender,
-                'message' => $message,
-            ]);
+            $response = \Illuminate\Support\Facades\Http::acceptJson()
+                ->connectTimeout(5)
+                ->timeout(10)
+                ->post("https://api.mnotify.com/api/sms/quick?key={$apiKey}", [
+                    'recipient' => [$to],
+                    'sender' => $sender,
+                    'message' => $message,
+                ]);
 
             if ($response->failed()) {
                 \Illuminate\Support\Facades\Log::error('SMS sending failed: ' . $response->body());
@@ -40,6 +43,22 @@ if (!function_exists('send_email_otp')) {
             \Illuminate\Support\Facades\Mail::to($email)->queue(new \App\Mail\OtpMail($otp));
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Email sending failed: ' . $e->getMessage());
+        }
+    }
+}
+
+if (!function_exists('queue_otp_sms')) {
+
+    /**
+     * Dispatch the SMS off the request path so a slow/unreachable gateway
+     * can never block signup, login or password-reset requests.
+     */
+    function queue_otp_sms($to, $message)
+    {
+        try {
+            \App\Jobs\SendOtpSmsJob::dispatch($to, $message);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('SMS dispatch failed: ' . $e->getMessage());
         }
     }
 }

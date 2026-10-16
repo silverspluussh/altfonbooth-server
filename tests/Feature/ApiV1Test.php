@@ -41,6 +41,70 @@ class ApiV1Test extends TestCase
         ]);
     }
 
+    public function test_v1_register_reissues_otp_for_pending_registration(): void
+    {
+        Http::fake();
+        Mail::fake();
+
+        $payload = [
+            'firstname' => 'Pending',
+            'lastname' => 'User',
+            'username' => 'pendinguser',
+            'phonenumber' => '0243333333',
+            'emailaddress' => 'pending@example.com',
+            'country' => 'Ghana',
+            'password' => 'password123',
+            'confirm_password' => 'password123',
+        ];
+
+        $this->postJson('/api/v1/register', $payload)
+             ->assertStatus(200)
+             ->assertJson(['status' => true]);
+
+        $firstOtp = SubscribersTempModel::where('username', 'pendinguser')->value('otp');
+
+        $this->postJson('/api/v1/register', $payload)
+             ->assertStatus(200)
+             ->assertJson(['status' => true]);
+
+        // The pending registration is reused, not duplicated.
+        $this->assertSame(1, SubscribersTempModel::where('username', 'pendinguser')->count());
+
+        $secondOtp = SubscribersTempModel::where('username', 'pendinguser')->value('otp');
+
+        $this->assertNotNull($secondOtp);
+        $this->assertNotSame($firstOtp, $secondOtp);
+    }
+
+    public function test_v1_register_rejects_existing_subscriber(): void
+    {
+        Http::fake();
+        Mail::fake();
+
+        SubscribersModel::create([
+            'subscriberid' => 'SUB_EXIST',
+            'fullname' => 'Existing User',
+            'username' => 'existinguser',
+            'password' => bcrypt('password123'),
+            'phonenumber' => '0244444444',
+            'emailaddress' => 'existing@example.com',
+            'country' => 'Ghana',
+        ]);
+
+        $this->postJson('/api/v1/register', [
+            'firstname' => 'Existing',
+            'lastname' => 'User',
+            'username' => 'existinguser',
+            'phonenumber' => '0249999999',
+            'emailaddress' => 'new@example.com',
+            'country' => 'Ghana',
+            'password' => 'password123',
+            'confirm_password' => 'password123',
+        ])
+             ->assertStatus(409)
+             ->assertJson(['status' => false]);
+    }
+
     public function test_v1_verify_otp_creates_subscriber_and_provisions(): void
     {
         Http::fake();

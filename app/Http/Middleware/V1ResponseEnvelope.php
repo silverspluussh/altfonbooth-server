@@ -37,6 +37,18 @@ class V1ResponseEnvelope
             ?? ($payload['error']['message'] ?? 'Request failed');
 
         $error = $payload['error'] ?? [];
+
+        // Surface field-level validation errors so clients can show something useful
+        // instead of a generic "Validation errors" message.
+        $details = $payload['errors'] ?? ($error['details'] ?? null);
+        if (is_array($details) && $details !== []) {
+            $first = collect($details)->flatten()->first();
+            if (is_string($first) && $first !== '') {
+                $message = $first;
+            }
+            $error['details'] = $details;
+        }
+
         $error['code'] = $error['code'] ?? ($statusCode >= 400 ? $statusCode : 400);
         $error['message'] = $error['message'] ?? $message;
 

@@ -24,15 +24,15 @@ class AuthController extends Controller
     public function signup(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'username' => 'required|string|max:50|unique:subscribers,username|unique:subscribers_temp,username',
+            'username' => 'required|string|max:50',
             'password' => 'required|string|min:8|max:100',
             'confirm_password' => 'sometimes|string|same:password',
-            'phonenumber' => 'required|string|max:20|unique:subscribers,phonenumber|unique:subscribers_temp,phonenumber',
+            'phonenumber' => 'required|string|max:20',
             'fullname' => 'nullable|string|max:255',
             'firstname' => 'nullable|string|max:255',
             'lastname' => 'nullable|string|max:255',
-            'emailaddress' => 'nullable|email|max:180|unique:subscribers,emailaddress|unique:subscribers_temp,emailaddress',
-            'email' => 'nullable|email|max:180|unique:subscribers,emailaddress|unique:subscribers_temp,emailaddress',
+            'emailaddress' => 'nullable|email|max:180',
+            'email' => 'nullable|email|max:180',
             'country' => 'nullable|string|max:100',
         ]);
 
@@ -43,10 +43,22 @@ class AuthController extends Controller
         $fullname = $this->resolveFullname($request);
         $emailaddress = $request->input('emailaddress') ?? $request->input('email');
 
+        // A fully-registered account must not be created twice; tell the user to sign in.
+        $existingSubscriber = SubscribersModel::where('username', $request->username)
+            ->orWhere('phonenumber', $request->phonenumber)
+            ->when($emailaddress, fn ($q) => $q->orWhere('emailaddress', $emailaddress))
+            ->first();
+
+        if ($existingSubscriber) {
+            return response()->json([
+                'status' => false,
+                'message' => 'An account with these details already exists. Please sign in instead.',
+            ], 409);
+        }
+
         $otp = sprintf('%06d', random_int(0, 999999));
 
-        $tempSubscriber = SubscribersTempModel::create([
-            'subscriberid' => 'TEMP_' . strtoupper(Str::random(10)),
+        $attributes = [
             'fullname' => $fullname,
             'username' => $request->username,
             'password' => Hash::make($request->password),
@@ -56,9 +68,25 @@ class AuthController extends Controller
             'otp' => $otp,
             'otp_expiration' => Carbon::now()->addMinutes(self::OTP_DEFAULT_TTL_MINUTES),
             'status' => 'pending',
-        ]);
+        ];
 
-        send_sms_mnotify($request->phonenumber, "Your OTP Code: $otp");
+        // Reuse a still-pending registration (missed/expired OTP, re-submit) instead
+        // of failing on a duplicate row that the user cannot clear themselves.
+        $pending = SubscribersTempModel::where('username', $request->username)
+            ->orWhere('phonenumber', $request->phonenumber)
+            ->when($emailaddress, fn ($q) => $q->orWhere('emailaddress', $emailaddress))
+            ->latest()
+            ->first();
+
+        if ($pending) {
+            $pending->update($attributes);
+        } else {
+            SubscribersTempModel::create([
+                'subscriberid' => 'TEMP_' . strtoupper(Str::random(10)),
+            ] + $attributes);
+        }
+
+        queue_otp_sms($request->phonenumber, "Your OTP Code: $otp");
 
         if ($emailaddress) {
             send_email_otp($emailaddress, $otp);
@@ -165,7 +193,7 @@ class AuthController extends Controller
                 'otp_expiration' => $expiration,
             ]);
 
-            send_sms_mnotify($tempUser->phonenumber, "Your new OTP Code: $code");
+            queue_otp_sms($tempUser->phonenumber, "Your new OTP Code: $code");
             if ($tempUser->emailaddress) {
                 send_email_otp($tempUser->emailaddress, $code);
             }
@@ -266,7 +294,7 @@ class AuthController extends Controller
             'password_reset_expiration' => Carbon::now()->addHour(),
         ]);
 
-        send_sms_mnotify($subscriber->phonenumber, "Your password reset code: $token");
+        queue_otp_sms($subscriber->phonenumber, "Your password reset code: $token");
         if ($subscriber->emailaddress) {
             send_email_otp($subscriber->emailaddress, "Your password reset code is: $token");
         }
