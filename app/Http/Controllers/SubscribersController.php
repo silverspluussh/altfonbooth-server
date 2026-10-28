@@ -408,8 +408,10 @@ class SubscribersController extends Controller
             return response()->json(['status' => false, 'message' => 'SIP account not found or unauthorized'], 404);
         }
 
-        // Get email from request, subscriber profile, or fallback
-        $email = $request->email ?? $subscriber->emailaddress;
+        // Prefer the email entered at checkout, then fall back to the profile.
+        $email = $request->filled('email')
+            ? trim((string) $request->email)
+            : $subscriber->emailaddress;
 
         if (!$email) {
             return response()->json(['status' => false, 'message' => 'Email is required for payment. Please enter your email address or update it in Account Settings.'], 400);
@@ -423,10 +425,12 @@ class SubscribersController extends Controller
         }
         
         try {
-            $callbackUrl = config('app.frontend_url') . '/dashboard.html';
-            
+            $callbackUrl = $request->input('origin') === 'mobile'
+                ? config('services.paystack.mobile_callback_url')
+                : config('app.frontend_url') . '/dashboard.html';
+
             $response = Http::withToken($secretKey)->post('https://api.paystack.co/transaction/initialize', [
-                'amount' => $request->amount * 100, // Paystack expects amount in kobo
+                'amount' => (int) round($request->amount * 100), // Paystack expects the smallest currency unit
                 'email' => $email,
                 'callback_url' => $callbackUrl,
                 'metadata' => [
@@ -516,6 +520,26 @@ class SubscribersController extends Controller
                         'status' => false,
                         'message' => 'Invalid payment metadata'
                     ], 400);
+                }
+
+                $subscriber = $request->user();
+                if ($subscriber) {
+                    $ownsAccount = SubscriberAuthModel::where('authusername', $authusername)
+                        ->where('subscriberid', $subscriber->subscriberid)
+                        ->exists();
+
+                    if (!$ownsAccount) {
+                        \Log::warning('Payment verification attempted for an account that does not belong to the user', [
+                            'authusername' => $authusername,
+                            'subscriberid' => $subscriber->subscriberid,
+                            'reference' => $request->reference,
+                        ]);
+
+                        return response()->json([
+                            'status' => false,
+                            'message' => 'This payment does not belong to your account'
+                        ], 403);
+                    }
                 }
 
                 $amount = $data['amount'] / 100; // Convert back from kobo

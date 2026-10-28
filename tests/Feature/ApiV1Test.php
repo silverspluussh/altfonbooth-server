@@ -426,4 +426,131 @@ class ApiV1Test extends TestCase
                  ->assertJson(['status' => false])
                  ->assertJsonPath('error.code', 403);
     }
+
+    public function test_payment_complete_page_loads(): void
+    {
+        $this->get('/payment-complete')
+             ->assertOk()
+             ->assertSee('Payment received');
+    }
+
+    public function test_v1_payment_initialize_uses_mobile_callback(): void
+    {
+        config([
+            'services.paystack.secret_key' => 'sk_test_example',
+            'services.paystack.mobile_callback_url' => 'https://appapi.altfon.com/payment-complete',
+        ]);
+
+        Http::fake([
+            'https://api.paystack.co/transaction/initialize' => Http::response([
+                'status' => true,
+                'data' => [
+                    'authorization_url' => 'https://checkout.paystack.com/mobile-checkout',
+                    'reference' => 'ref_mobile_123',
+                ],
+            ], 200),
+        ]);
+
+        SubscribersModel::create([
+            'subscriberid' => 'SUB_V1PAY',
+            'fullname' => 'Pay V1',
+            'username' => 'pay1',
+            'password' => bcrypt('password123'),
+            'phonenumber' => '0201111222',
+            'emailaddress' => 'pay1@example.com',
+            'country' => 'Ghana',
+        ]);
+
+        \App\Models\SubscriberAuthModel::create([
+            'subscriberid' => 'SUB_V1PAY',
+            'authusername' => '777002',
+            'authpassword' => 'secret',
+            'status' => 'active',
+        ]);
+
+        $login = $this->postJson('/api/v1/login', ['username' => 'pay1', 'password' => 'password123']);
+        $token = $login->json('data.access_token');
+
+        $response = $this->withHeader('Authorization', "Bearer $token")
+                         ->postJson('/api/v1/payments/initialize', [
+                             'authusername' => '777002',
+                             'amount' => 50,
+                             'email' => 'buyer@example.com',
+                         ]);
+
+        $response->assertStatus(200)
+                 ->assertJson(['status' => true])
+                 ->assertJsonPath('data.authorization_url', 'https://checkout.paystack.com/mobile-checkout')
+                 ->assertJsonPath('data.reference', 'ref_mobile_123');
+
+        Http::assertSent(function ($request) {
+            return $request->url() === 'https://api.paystack.co/transaction/initialize'
+                && $request['callback_url'] === 'https://appapi.altfon.com/payment-complete'
+                && $request['email'] === 'buyer@example.com'
+                && $request['amount'] === 5000
+                && $request['metadata']['authusername'] === '777002';
+        });
+    }
+
+    public function test_v1_verify_payment_rejects_foreign_account(): void
+    {
+        config(['services.paystack.secret_key' => 'sk_test_example']);
+
+        Http::fake([
+            'https://api.paystack.co/transaction/verify/ref_foreign' => Http::response([
+                'status' => true,
+                'data' => [
+                    'status' => 'success',
+                    'amount' => 5000,
+                    'metadata' => ['authusername' => '888002'],
+                ],
+            ], 200),
+        ]);
+
+        SubscribersModel::create([
+            'subscriberid' => 'SUB_V1OWN',
+            'fullname' => 'Owner V1',
+            'username' => 'ownerpay',
+            'password' => bcrypt('password123'),
+            'phonenumber' => '0201111333',
+            'emailaddress' => 'ownerpay@example.com',
+            'country' => 'Ghana',
+        ]);
+
+        \App\Models\SubscriberAuthModel::create([
+            'subscriberid' => 'SUB_V1OWN',
+            'authusername' => '777003',
+            'authpassword' => 'secret',
+            'status' => 'active',
+        ]);
+
+        SubscribersModel::create([
+            'subscriberid' => 'SUB_V1FOREIGN',
+            'fullname' => 'Foreign V1',
+            'username' => 'foreignpay',
+            'password' => bcrypt('password123'),
+            'phonenumber' => '0201111444',
+            'emailaddress' => 'foreignpay@example.com',
+            'country' => 'Ghana',
+        ]);
+
+        \App\Models\SubscriberAuthModel::create([
+            'subscriberid' => 'SUB_V1FOREIGN',
+            'authusername' => '888002',
+            'authpassword' => 'secret',
+            'status' => 'active',
+        ]);
+
+        $login = $this->postJson('/api/v1/login', ['username' => 'ownerpay', 'password' => 'password123']);
+        $token = $login->json('data.access_token');
+
+        $response = $this->withHeader('Authorization', "Bearer $token")
+                         ->postJson('/api/v1/verifypayment', [
+                             'referenceid' => 'ref_foreign',
+                         ]);
+
+        $response->assertStatus(403)
+                 ->assertJson(['status' => false])
+                 ->assertJsonPath('error.message', 'This payment does not belong to your account');
+    }
 }

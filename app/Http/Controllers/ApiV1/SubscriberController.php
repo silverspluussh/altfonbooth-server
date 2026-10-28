@@ -92,6 +92,15 @@ class SubscriberController
         return response()->json(['status' => true, 'data' => $decoded]);
     }
 
+    public function initializePayment(Request $request): JsonResponse
+    {
+        // Mobile clients use the in-app Paystack checkout, so make sure the
+        // callback always returns to the app instead of the web dashboard.
+        $request->merge(['origin' => 'mobile']);
+
+        return app(SubscribersController::class)->initializePayment($request);
+    }
+
     public function verifyPayment(Request $request): JsonResponse
     {
         return app(SubscribersController::class)->verifyPayment($request);

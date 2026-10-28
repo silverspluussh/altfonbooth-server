@@ -19,6 +19,8 @@ return [
     'paystack' => [
         'secret_key' => env('PAYSTACK_SECRET_KEY'),
         'public_key' => env('PAYSTACK_PUBLIC_KEY', ''),
+        'mobile_callback_url' => env('PAYSTACK_MOBILE_CALLBACK_URL')
+            ?: rtrim(env('APP_URL') ?: 'http://localhost', '/') . '/payment-complete',
     ],
 
     'booth' => [

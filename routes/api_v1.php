@@ -28,6 +28,7 @@ Route::prefix('api/v1')->middleware(['v1.normalize', 'v1.envelope'])->group(func
 
     Route::middleware(['auth:api', 'throttle:20,1'])->group(function () {
         Route::post('check-balance', [SubscriberController::class, 'checkBalance']);
+        Route::post('payments/initialize', [SubscriberController::class, 'initializePayment']);
         Route::post('verifypayment', [SubscriberController::class, 'verifyPayment']);
         Route::post('payment-link', [SubscriberController::class, 'paymentLink']);
     });
