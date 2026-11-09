@@ -12,6 +12,7 @@ use App\Models\SubscriberAuthModel;
 use App\Models\SubscriberDestModel;
 use App\Models\PrepaidCredit;
 use App\Services\BoothApiService;
+use App\Services\PrepaidCreditService;
 use App\Support\Msisdn;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -413,20 +414,23 @@ class AdminController extends Controller
 
         $transactionId = 'ADM_TXN_' . strtoupper(Str::random(12));
 
-        $credit = PrepaidCredit::create([
-            'authusername' => $request->authusername,
-            'amount' => $request->amount,
-            'transaction_id' => $transactionId,
-            'status' => 'completed',
-        ]);
-
-        $this->booth()->topup($request->authusername, $request->amount);
+        $credit = app(PrepaidCreditService::class)->credit(
+            $request->authusername,
+            (float) $request->amount,
+            $transactionId,
+            'admin',
+        );
 
         $externalBalance = $this->booth()->getBalance($request->authusername);
+        $settled = $credit->status === PrepaidCredit::STATUS_COMPLETED;
 
         return response()->json([
             'status' => true,
-            'message' => 'Credits added successfully',
+            'message' => $settled
+                ? 'Credits added successfully'
+                : 'Credits queued; the top-up will be retried.',
+            'pending' => !$settled,
+            'credit_status' => $credit->status,
             'balance' => $this->booth()->extractBalance($externalBalance) ?? 'N/A',
             'transaction_id' => $transactionId,
         ], 201);

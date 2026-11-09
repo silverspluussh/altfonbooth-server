@@ -30,6 +30,8 @@ class SubscriberAuthModel extends Model
 
     public function getBalanceAttribute()
     {
-        return $this->credits()->sum('amount');
+        return $this->credits()
+            ->where('status', PrepaidCredit::STATUS_COMPLETED)
+            ->sum('amount');
     }
 }

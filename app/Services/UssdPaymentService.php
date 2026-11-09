@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Contracts\PaymentProvider;
 use App\Exceptions\AmountMismatchException;
 use App\Exceptions\PaymentInitFailedException;
-use App\Jobs\RetryUssdTopupJob;
 use App\Models\PrepaidCredit;
 use App\Models\SubscriberAuthModel;
 use App\Models\SubscribersModel;
@@ -17,11 +16,12 @@ use Throwable;
 
 class UssdPaymentService
 {
-    public const MAX_TOPUP_ATTEMPTS = 5;
+    public const MAX_TOPUP_ATTEMPTS = PrepaidCreditService::MAX_TOPUP_ATTEMPTS;
 
     public function __construct(
         private BoothApiService $booth,
         private PaymentProvider $provider,
+        private PrepaidCreditService $credits,
     ) {
     }
 
@@ -286,7 +286,7 @@ class UssdPaymentService
         float $paidAmount,
         string $providerStatus,
     ): UssdPaymentIntent {
-        return DB::transaction(function () use ($reference, $externalRef, $paidAmount, $providerStatus) {
+        $intent = DB::transaction(function () use ($reference, $externalRef, $paidAmount, $providerStatus) {
             $intent = UssdPaymentIntent::where('reference', $reference)
                 ->lockForUpdate()
                 ->first();
@@ -321,19 +321,12 @@ class UssdPaymentService
             }
 
             if ($intent->status === UssdPaymentIntent::STATUS_PENDING_TOPUP) {
-                $this->attemptTopup($intent);
+                if ($externalRef) {
+                    $intent->update(['external_ref' => $externalRef]);
+                }
 
                 return $intent->refresh();
             }
-
-            PrepaidCredit::firstOrCreate(
-                ['transaction_id' => $intent->reference],
-                [
-                    'authusername' => $intent->authusername,
-                    'amount' => $intent->amount,
-                    'status' => 'completed',
-                ],
-            );
 
             $intent->update([
                 'status' => UssdPaymentIntent::STATUS_PROCESSING,
@@ -342,29 +335,38 @@ class UssdPaymentService
                 'paid_at' => now(),
             ]);
 
-            $this->attemptTopup($intent);
-
             return $intent->refresh();
         });
+
+        if (strtolower($providerStatus) !== 'success') {
+            return $intent;
+        }
+
+        if ($intent->status === UssdPaymentIntent::STATUS_COMPLETED) {
+            return $intent;
+        }
+
+        // The credit service owns the Booth top-up, retry state, SMS and the
+        // intent status sync, so USSD and web/mobile share one money path.
+        $this->credits->credit(
+            $intent->authusername,
+            (float) $intent->amount,
+            $intent->reference,
+            'ussd',
+        );
+
+        return $intent->refresh();
     }
 
     public function retryTopup(UssdPaymentIntent $intent): bool
     {
-        return DB::transaction(function () use ($intent) {
-            $locked = UssdPaymentIntent::whereKey($intent->id)
-                ->lockForUpdate()
-                ->first();
+        $credit = PrepaidCredit::where('transaction_id', $intent->reference)->first();
 
-            if (
-                !$locked
-                || $locked->status !== UssdPaymentIntent::STATUS_PENDING_TOPUP
-                || $locked->topup_attempts >= self::MAX_TOPUP_ATTEMPTS
-            ) {
-                return false;
-            }
+        if (!$credit) {
+            return false;
+        }
 
-            return $this->attemptTopup($locked, false);
-        });
+        return $this->credits->retry($credit);
     }
 
     public function balanceFor(string $authusername): ?float
@@ -384,52 +386,6 @@ class UssdPaymentService
             UssdPaymentIntent::STATUS_PENDING_TOPUP => 'Payment received. Credit is being applied.',
             default => 'Payment is processing.',
         };
-    }
-
-    private function attemptTopup(UssdPaymentIntent $intent, bool $scheduleRetry = true): bool
-    {
-        $response = $this->booth->topup($intent->authusername, (float) $intent->amount);
-        $succeeded = $response !== null && $response->successful();
-        $attempts = $intent->topup_attempts + 1;
-
-        if ($succeeded) {
-            $intent->update([
-                'status' => UssdPaymentIntent::STATUS_COMPLETED,
-                'failure_reason' => null,
-                'topup_attempts' => $attempts,
-            ]);
-
-            $amount = number_format((float) $intent->amount, 2, '.', '');
-
-            DB::afterCommit(fn () => queue_otp_sms(
-                $intent->msisdn,
-                "Altfon: Your recharge of GHS {$amount} was successful.",
-            ));
-
-            return true;
-        }
-
-        $intent->update([
-            'status' => UssdPaymentIntent::STATUS_PENDING_TOPUP,
-            'failure_reason' => 'Booth top-up failed.',
-            'topup_attempts' => $attempts,
-        ]);
-
-        if ($attempts >= self::MAX_TOPUP_ATTEMPTS) {
-            Log::critical('USSD payment top-up repeatedly failed', [
-                'reference' => $intent->reference,
-                'authusername' => $intent->authusername,
-                'attempts' => $attempts,
-            ]);
-
-            return false;
-        }
-
-        if ($scheduleRetry) {
-            DB::afterCommit(fn () => RetryUssdTopupJob::dispatch($intent->id));
-        }
-
-        return false;
     }
 
     private function createReference(): string

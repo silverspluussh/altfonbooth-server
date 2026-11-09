@@ -400,6 +400,23 @@
             </tbody>
           </table>
         </div>
+
+        <h4 style="margin: 30px 0 16px; font-weight: 800; color: var(--primary);">Pending / Processing Top-ups</h4>
+        <div style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px;">
+          <table class="data-table" style="font-size: 0.85rem;">
+            <thead style="background: var(--bg);">
+              <tr>
+                <th style="padding: 12px 15px; position: sticky; top: 0;">Date</th>
+                <th style="padding: 12px 15px; position: sticky; top: 0;">Account</th>
+                <th style="padding: 12px 15px; position: sticky; top: 0;">Amount</th>
+                <th style="padding: 12px 15px; position: sticky; top: 0;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="pendingHistoryBody">
+              <!-- Dynamic Rows -->
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -487,10 +504,18 @@
 
     async function loadPurchaseHistory() {
       const tbody = document.getElementById('purchaseHistoryBody');
+      const pendingBody = document.getElementById('pendingHistoryBody');
       tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 20px;">Loading history...</td></tr>';
+      if (pendingBody) {
+        pendingBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 20px;">Loading pending top-ups...</td></tr>';
+      }
       try {
-        const response = await apiRequest('/purchase-history');
+        const [response, pendingResponse] = await Promise.all([
+          apiRequest('/purchase-history'),
+          apiRequest('/purchase-history/pending').catch(() => ({ data: [] })),
+        ]);
         const history = response.data || [];
+        const pending = pendingResponse.data || [];
         tbody.innerHTML = history.length === 0 ? '<tr><td colspan="4" style="text-align:center; padding: 40px; color: var(--secondary);">No purchase history found.</td></tr>' : '';
         
         history.forEach(item => {
@@ -503,6 +528,21 @@
           `;
           tbody.appendChild(row);
         });
+
+        if (pendingBody) {
+          pendingBody.innerHTML = pending.length === 0 ? '<tr><td colspan="4" style="text-align:center; padding: 40px; color: var(--secondary);">No pending top-ups.</td></tr>' : '';
+
+          pending.forEach(item => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td style="padding: 12px 15px;">${new Date(item.created_at).toLocaleDateString()}</td>
+              <td style="padding: 12px 15px; font-weight: 600;">${UI.esc(item.authusername)}</td>
+              <td style="padding: 12px 15px; font-weight: 700; color: var(--warning);">GH₵${parseFloat(item.amount).toFixed(2)}</td>
+              <td style="padding: 12px 15px;"><span class="badge badge-warning">${UI.esc(item.status)}</span></td>
+            `;
+            pendingBody.appendChild(row);
+          });
+        }
       } catch (error) { 
         tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 20px; color: var(--danger);">Failed to load history</td></tr>';
       }
@@ -795,7 +835,12 @@
             });
 
             if (verifyRes.status) {
-              UI.showToast('Credits purchased successfully!');
+              UI.showToast(
+                verifyRes.pending
+                  ? 'Payment received. Credit is being applied.'
+                  : 'Credits purchased successfully!',
+                verifyRes.pending ? 'info' : 'success'
+              );
               localStorage.removeItem('pendingPayment');
               window.__paymentJustCompleted = true;
             } else {

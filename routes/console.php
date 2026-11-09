@@ -8,6 +8,10 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Schedule::command('ussd:reconcile')
+Artisan::command('ussd:reconcile {reference?}', function ($reference = null) {
+    return $this->call('payments:reconcile', ['reference' => $reference]);
+})->purpose('Alias for payments:reconcile');
+
+Schedule::command('payments:reconcile')
     ->everyMinute()
     ->withoutOverlapping();

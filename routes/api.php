@@ -47,6 +47,8 @@ Route::middleware(['auth:api', 'throttle:60,1'])->group(function () {
         Route::post('/payments/initialize', [SubscribersController::class, 'initializePayment']);
     });
     Route::get('/purchase-history', [SubscribersController::class, 'getPurchaseHistory']);
+    Route::get('/purchase-history/pending', [SubscribersController::class, 'getPendingPurchaseHistory']);
+    Route::get('/purchase-history/failed', [SubscribersController::class, 'getFailedPurchaseHistory']);
 
     // Settings & Updates
     Route::post('/update-profile', [SubscribersController::class, 'updateProfile']);

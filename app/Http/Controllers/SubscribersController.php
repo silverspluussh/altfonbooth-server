@@ -10,6 +10,7 @@ use App\Models\SubscriberDestModel;
 use App\Models\SubscribersModel;
 use App\Models\VoiceRelay;
 use App\Services\BoothApiService;
+use App\Services\PrepaidCreditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -436,6 +437,7 @@ class SubscribersController extends Controller
                 'metadata' => [
                     'authusername' => $request->authusername,
                     'subscriberid' => $subscriber->subscriberid,
+                    'source' => $request->input('origin') === 'mobile' ? 'mobile' : 'web',
                 ],
             ]);
 
@@ -543,43 +545,32 @@ class SubscribersController extends Controller
                 }
 
                 $amount = $data['amount'] / 100; // Convert back from kobo
+                $source = $request->input('origin') === 'mobile' ? 'mobile' : 'web';
 
-                // Check if this reference has already been processed to prevent double-crediting
-                $existing = PrepaidCredit::where('transaction_id', $request->reference)->first();
-                if ($existing) {
-                    \Log::info('Payment already processed', ['reference' => $request->reference]);
-
-                    $externalBalance = $this->booth()->getBalance($authusername);
-
-                    return response()->json([
-                        'status' => true,
-                        'message' => 'Payment already processed',
-                        'balance' => $this->booth()->extractBalance($externalBalance) ?? 'N/A',
-                        'transaction_id' => $request->reference
-                    ]);
-                }
-
-                // Credit the account
-                $credit = PrepaidCredit::create([
-                    'authusername' => $authusername,
-                    'amount' => $amount,
-                    'transaction_id' => $request->reference,
-                    'status' => 'completed'
-                ]);
-
-                $this->booth()->topup($authusername, $amount);
+                $credit = app(PrepaidCreditService::class)->credit(
+                    $authusername,
+                    (float) $amount,
+                    $request->reference,
+                    $source,
+                );
 
                 $externalBalance = $this->booth()->getBalance($authusername);
+                $settled = $credit->status === PrepaidCredit::STATUS_COMPLETED;
 
-                \Log::info('Payment verified and account credited', [
+                \Log::info('Payment verified', [
                     'authusername' => $authusername,
                     'amount' => $amount,
-                    'reference' => $request->reference
+                    'reference' => $request->reference,
+                    'credit_status' => $credit->status,
                 ]);
 
                 return response()->json([
                     'status' => true,
-                    'message' => 'Payment verified and account credited',
+                    'message' => $settled
+                        ? 'Payment verified and account credited'
+                        : 'Payment received. Credit is being applied.',
+                    'pending' => !$settled,
+                    'credit_status' => $credit->status,
                     'balance' => $this->booth()->extractBalance($externalBalance) ?? 'N/A',
                     'transaction_id' => $request->reference
                 ]);
@@ -608,18 +599,37 @@ class SubscribersController extends Controller
 
     public function getPurchaseHistory(Request $request): JsonResponse
     {
+        return $this->purchaseHistory($request, [PrepaidCredit::STATUS_COMPLETED]);
+    }
+
+    public function getPendingPurchaseHistory(Request $request): JsonResponse
+    {
+        return $this->purchaseHistory($request, [
+            PrepaidCredit::STATUS_PENDING_TOPUP,
+            PrepaidCredit::STATUS_PROCESSING,
+        ]);
+    }
+
+    public function getFailedPurchaseHistory(Request $request): JsonResponse
+    {
+        return $this->purchaseHistory($request, [PrepaidCredit::STATUS_FAILED]);
+    }
+
+    private function purchaseHistory(Request $request, array $statuses): JsonResponse
+    {
         $subscriber = $request->user();
-        
+
         $authUsernames = SubscriberAuthModel::where('subscriberid', $subscriber->subscriberid)
             ->pluck('authusername');
-            
+
         $history = PrepaidCredit::whereIn('authusername', $authUsernames)
-            ->orderBy('created_at', 'desc')
+            ->whereIn('status', $statuses)
+            ->orderByDesc('created_at')
             ->get();
-            
+
         return response()->json([
             'status' => true,
-            'data' => $history
+            'data' => $history,
         ]);
     }
 

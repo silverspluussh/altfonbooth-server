@@ -672,6 +672,7 @@ async function loadPurchaseHistory() {
             { label: 'SIP', key: 'authusername' },
             { label: 'Amount (GH₵)', render: t => Number(t.amount).toFixed(4) },
             { label: 'Transaction ID', render: t => `<code>${UI.esc(t.transaction_id)}</code>` },
+            { label: 'Source', render: t => UI.esc(t.source || 'unknown') },
             { label: 'Status', render: t => `<span class="badge badge-${t.status === 'completed' ? 'success' : 'warning'}">${UI.esc(t.status)}</span>` },
             { label: 'Date', render: t => t.created_at ? new Date(t.created_at).toLocaleString() : '' },
         ]);
@@ -697,7 +698,10 @@ async function showAddCreditsModal() {
         const res = await adminApiRequest('/admin/credits', {
             method: 'POST', body: JSON.stringify(data)
         });
-        UI.showToast(`Credits added. New balance: GH₵${res.balance}`);
+        UI.showToast(
+            res.pending ? 'Credits queued; the top-up will be retried.' : `Credits added. New balance: GH₵${res.balance}`,
+            res.pending ? 'info' : 'success'
+        );
         await loadPurchaseHistory();
     }, 'Add Credits');
 }

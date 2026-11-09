@@ -24,6 +24,9 @@ Route::prefix('api/v1')->middleware(['v1.normalize', 'v1.envelope'])->group(func
         Route::get('all-contacts', [SubscriberController::class, 'allContacts']);
         Route::get('subscribers', [SubscriberController::class, 'subscriberList']);
         Route::get('voice-relays', [SubscriberController::class, 'voiceRelays']);
+        Route::get('purchase-history', [SubscriberController::class, 'purchaseHistory']);
+        Route::get('purchase-history/pending', [SubscriberController::class, 'pendingPurchaseHistory']);
+        Route::get('purchase-history/failed', [SubscriberController::class, 'failedPurchaseHistory']);
     });
 
     Route::middleware(['auth:api', 'throttle:20,1'])->group(function () {

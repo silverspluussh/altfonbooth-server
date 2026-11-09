@@ -103,7 +103,24 @@ class SubscriberController
 
     public function verifyPayment(Request $request): JsonResponse
     {
+        $request->merge(['origin' => 'mobile']);
+
         return app(SubscribersController::class)->verifyPayment($request);
+    }
+
+    public function purchaseHistory(Request $request): JsonResponse
+    {
+        return app(SubscribersController::class)->getPurchaseHistory($request);
+    }
+
+    public function pendingPurchaseHistory(Request $request): JsonResponse
+    {
+        return app(SubscribersController::class)->getPendingPurchaseHistory($request);
+    }
+
+    public function failedPurchaseHistory(Request $request): JsonResponse
+    {
+        return app(SubscribersController::class)->getFailedPurchaseHistory($request);
     }
 
     public function paymentLink(Request $request): JsonResponse

@@ -55,6 +55,7 @@ const UI = {
                     box-shadow: 0 10px 30px rgba(0,0,0,0.2);
                 }
                 .toast-success { background: #010a4c; }
+                .toast-info { background: #0d6efd; }
                 .toast-error { background: #DC3545; }
                 @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
             `;

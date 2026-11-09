@@ -40,14 +40,5 @@ class ReconcileUssdPaymentsJob implements ShouldQueue
                     }
                 }
             });
-
-        UssdPaymentIntent::where('status', UssdPaymentIntent::STATUS_PENDING_TOPUP)
-            ->where('topup_attempts', '<', UssdPaymentService::MAX_TOPUP_ATTEMPTS)
-            ->where('updated_at', '<=', now()->subMinute())
-            ->chunkById(100, function ($intents) use ($payments) {
-                foreach ($intents as $intent) {
-                    $payments->retryTopup($intent);
-                }
-            });
     }
 }

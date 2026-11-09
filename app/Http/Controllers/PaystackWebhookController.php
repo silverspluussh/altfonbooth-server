@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\AmountMismatchException;
+use App\Models\SubscriberAuthModel;
+use App\Models\UssdPaymentIntent;
+use App\Services\PrepaidCreditService;
 use App\Services\UssdPaymentService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
@@ -12,8 +15,10 @@ use Throwable;
 
 class PaystackWebhookController extends Controller
 {
-    public function __construct(private UssdPaymentService $payments)
-    {
+    public function __construct(
+        private UssdPaymentService $payments,
+        private PrepaidCreditService $credits,
+    ) {
     }
 
     public function verify(): JsonResponse
@@ -84,6 +89,12 @@ class PaystackWebhookController extends Controller
         $paidAmount = ((float) $data['amount']) / 100;
         $externalRef = isset($data['id']) ? (string) $data['id'] : null;
 
+        if (!UssdPaymentIntent::where('reference', $reference)->exists()) {
+            $this->creditWebPayment($data, $reference, $paidAmount);
+
+            return;
+        }
+
         try {
             $this->payments->confirm($reference, $externalRef, $paidAmount, 'success');
         } catch (ModelNotFoundException) {
@@ -97,6 +108,54 @@ class PaystackWebhookController extends Controller
                 'error' => $exception->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Safety net for web/mobile/dashboard payments: credit them even if the
+     * client never calls the verify endpoint. The credit service is idempotent.
+     */
+    private function creditWebPayment(array $data, string $reference, float $amount): void
+    {
+        $metadata = $data['metadata'] ?? [];
+
+        if (is_string($metadata)) {
+            $metadata = json_decode($metadata, true) ?: [];
+        }
+
+        if (!is_array($metadata) || $amount <= 0) {
+            return;
+        }
+
+        $authusername = trim((string) ($metadata['authusername'] ?? ''));
+        $subscriberid = trim((string) ($metadata['subscriberid'] ?? ''));
+
+        if ($authusername === '' || $subscriberid === '') {
+            Log::info('Ignoring non-USSD Paystack payment without identifiable metadata', [
+                'reference' => $reference,
+            ]);
+
+            return;
+        }
+
+        $owns = SubscriberAuthModel::where('authusername', $authusername)
+            ->where('subscriberid', $subscriberid)
+            ->exists();
+
+        if (!$owns) {
+            Log::warning('Paystack webhook for a SIP that does not belong to the subscriber', [
+                'reference' => $reference,
+                'authusername' => $authusername,
+                'subscriberid' => $subscriberid,
+            ]);
+
+            return;
+        }
+
+        $source = in_array($metadata['source'] ?? null, ['web', 'mobile'], true)
+            ? $metadata['source']
+            : 'paystack';
+
+        $this->credits->credit($authusername, $amount, $reference, $source);
     }
 
     private function onFailed(array $data): void
