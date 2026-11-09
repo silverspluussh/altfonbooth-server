@@ -78,12 +78,26 @@ class UssdPaymentService
             throw new PaymentInitFailedException('Could not start the payment.', 0, $exception);
         }
 
-        $intent->update(['external_ref' => $result->externalRef]);
+        UssdPaymentIntent::whereKey($intent->id)
+            ->where('status', UssdPaymentIntent::STATUS_PENDING)
+            ->update([
+                'external_ref' => $result->externalRef,
+                'requires_otp' => $result->requiresOtp,
+                'updated_at' => now(),
+            ]);
+
+        $intent->refresh();
+
+        // A webhook or a concurrent confirm may have settled the intent already.
+        if ($intent->status !== UssdPaymentIntent::STATUS_PENDING) {
+            return $intent;
+        }
 
         if ($result->state === UssdPaymentIntent::STATUS_FAILED) {
             $intent->update([
                 'status' => UssdPaymentIntent::STATUS_FAILED,
                 'failure_reason' => $result->message,
+                'requires_otp' => false,
             ]);
 
             throw new PaymentInitFailedException($result->message);
@@ -98,7 +112,7 @@ class UssdPaymentService
             );
         }
 
-        return $intent->refresh();
+        return $intent;
     }
 
     public function refresh(UssdPaymentIntent $intent): UssdPaymentIntent
@@ -135,17 +149,114 @@ class UssdPaymentService
             $intent->update([
                 'status' => UssdPaymentIntent::STATUS_FAILED,
                 'failure_reason' => $result->message,
-                'external_ref' => $result->externalRef,
+                'external_ref' => $result->externalRef ?: $intent->external_ref,
+                'requires_otp' => false,
             ]);
 
             return $intent->refresh();
         }
 
-        if ($result->externalRef && $result->externalRef !== $intent->external_ref) {
-            $intent->update(['external_ref' => $result->externalRef]);
-        }
+        UssdPaymentIntent::whereKey($intent->id)
+            ->whereIn('status', [
+                UssdPaymentIntent::STATUS_PENDING,
+                UssdPaymentIntent::STATUS_PROCESSING,
+            ])
+            ->update([
+                'external_ref' => $result->externalRef ?: $intent->external_ref,
+                'requires_otp' => $result->requiresOtp,
+                'updated_at' => now(),
+            ]);
 
         return $intent->refresh();
+    }
+
+    public function submitOtp(string $reference, ?string $msisdn, string $otp): ?UssdPaymentIntent
+    {
+        $intent = $this->findIntent($reference, $msisdn);
+
+        if (!$intent) {
+            return null;
+        }
+
+        if ($intent->status !== UssdPaymentIntent::STATUS_PENDING) {
+            return $intent;
+        }
+
+        try {
+            $result = $this->provider->submitOtp($intent, $otp);
+        } catch (Throwable $exception) {
+            Log::warning('USSD payment OTP submission failed', [
+                'reference' => $intent->reference,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return $intent->refresh();
+        }
+
+        if ($intent->refresh()->status !== UssdPaymentIntent::STATUS_PENDING) {
+            return $intent;
+        }
+
+        if ($result->state === UssdPaymentIntent::STATUS_COMPLETED) {
+            return $this->confirm(
+                $intent->reference,
+                $result->externalRef,
+                (float) $intent->amount,
+                'success',
+            );
+        }
+
+        if ($result->state === UssdPaymentIntent::STATUS_FAILED) {
+            $intent->update([
+                'status' => UssdPaymentIntent::STATUS_FAILED,
+                'failure_reason' => $result->message,
+                'external_ref' => $result->externalRef ?: $intent->external_ref,
+                'requires_otp' => false,
+            ]);
+
+            return $intent->refresh();
+        }
+
+        $intent->update([
+            'external_ref' => $result->externalRef ?: $intent->external_ref,
+            'requires_otp' => $result->requiresOtp,
+        ]);
+
+        return $intent->refresh();
+    }
+
+    public function fail(string $reference, ?string $reason = null): ?UssdPaymentIntent
+    {
+        $intent = UssdPaymentIntent::where('reference', $reference)->first();
+
+        if (!$intent) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($intent, $reason) {
+            $locked = UssdPaymentIntent::whereKey($intent->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$locked) {
+                return null;
+            }
+
+            if (in_array($locked->status, [
+                UssdPaymentIntent::STATUS_COMPLETED,
+                UssdPaymentIntent::STATUS_PENDING_TOPUP,
+            ], true)) {
+                return $locked;
+            }
+
+            $locked->update([
+                'status' => UssdPaymentIntent::STATUS_FAILED,
+                'failure_reason' => $reason ?: 'Payment failed or was cancelled.',
+                'requires_otp' => false,
+            ]);
+
+            return $locked->refresh();
+        });
     }
 
     public function confirm(
@@ -177,6 +288,7 @@ class UssdPaymentService
                         'status' => UssdPaymentIntent::STATUS_FAILED,
                         'failure_reason' => 'Provider reported a failed payment.',
                         'external_ref' => $externalRef ?: $intent->external_ref,
+                        'requires_otp' => false,
                     ]);
                 }
 
@@ -205,6 +317,7 @@ class UssdPaymentService
             $intent->update([
                 'status' => UssdPaymentIntent::STATUS_PROCESSING,
                 'external_ref' => $externalRef ?: $intent->external_ref,
+                'requires_otp' => false,
                 'paid_at' => now(),
             ]);
 

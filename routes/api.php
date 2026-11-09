@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\SubscribersController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\PaystackWebhookController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -105,3 +106,7 @@ Route::prefix('admin')->group(function () {
         });
     });
 });
+
+// Paystack webhooks — public, signature verified inside the controller.
+Route::get('/webhooks/paystack', [PaystackWebhookController::class, 'verify']);
+Route::post('/webhooks/paystack', [PaystackWebhookController::class, 'handle']);

@@ -27,7 +27,17 @@ class ReconcileUssdPaymentsJob implements ShouldQueue
             ->where('created_at', '<=', now()->subMinutes(2))
             ->chunkById(100, function ($intents) use ($payments) {
                 foreach ($intents as $intent) {
-                    $payments->refresh($intent);
+                    $refreshed = $payments->refresh($intent);
+
+                    $createdAt = $refreshed->created_at;
+
+                    if (
+                        $refreshed->status === UssdPaymentIntent::STATUS_PENDING
+                        && $createdAt !== null
+                        && $createdAt->lte(now()->subMinutes(15))
+                    ) {
+                        $payments->fail($refreshed->reference, 'Payment timed out.');
+                    }
                 }
             });
 

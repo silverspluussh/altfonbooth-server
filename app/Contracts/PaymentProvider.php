@@ -10,4 +10,6 @@ interface PaymentProvider
     public function initiate(UssdPaymentIntent $intent): PaymentResult;
 
     public function status(UssdPaymentIntent $intent): PaymentResult;
+
+    public function submitOtp(UssdPaymentIntent $intent, string $otp): PaymentResult;
 }

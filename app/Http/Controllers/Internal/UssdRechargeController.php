@@ -118,6 +118,37 @@ class UssdRechargeController extends Controller
         return $this->intentResponse($intent);
     }
 
+    public function submitOtp(Request $request): JsonResponse
+    {
+        if ($this->rechargeUnavailable()) {
+            return $this->error(
+                'RECHARGE_UNAVAILABLE',
+                'Recharge is temporarily unavailable.',
+                503,
+            );
+        }
+
+        $data = $request->validate([
+            'reference' => ['required', 'string', 'max:64'],
+            'msisdn' => ['required', 'string', 'max:20'],
+            'otp' => ['required', 'string', 'regex:/^\d{4,8}$/'],
+        ]);
+
+        $msisdn = $this->subscribers->internationalMsisdn($data['msisdn']);
+
+        if ($msisdn === null) {
+            return $this->error('INVALID_MSISDN', 'Enter a valid phone number.', 422);
+        }
+
+        $intent = $this->payments->submitOtp($data['reference'], $msisdn, $data['otp']);
+
+        if (!$intent) {
+            return $this->error('NOT_FOUND', 'Payment not found.', 404);
+        }
+
+        return $this->intentResponse($intent);
+    }
+
     public function status(Request $request, string $reference): JsonResponse
     {
         $data = $request->validate([
@@ -169,6 +200,7 @@ class UssdRechargeController extends Controller
         $data = [
             'reference' => $intent->reference,
             'state' => $intent->status,
+            'requiresOtp' => (bool) $intent->requires_otp,
             'message' => $this->payments->messageForState($intent->status),
             'transactionId' => $intent->status === UssdPaymentIntent::STATUS_COMPLETED
                 ? $intent->reference
@@ -206,13 +238,21 @@ class UssdRechargeController extends Controller
             return true;
         }
 
-        $provider = (string) config('services.ussd.payment_provider', 'fake');
+        $provider = strtolower((string) config('services.ussd.payment_provider', 'fake'));
 
-        if (!in_array($provider, ['fake'], true)) {
+        if (!in_array($provider, ['fake', 'paystack'], true)) {
             return true;
         }
 
-        return app()->environment('production') && $provider === 'fake';
+        if (app()->environment('production') && $provider === 'fake') {
+            return true;
+        }
+
+        if ($provider === 'paystack' && trim((string) config('services.paystack.secret_key', '')) === '') {
+            return true;
+        }
+
+        return false;
     }
 
     private function formatAmount(float $amount): string

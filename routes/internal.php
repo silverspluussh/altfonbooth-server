@@ -8,5 +8,6 @@ Route::post('/lookup', [UssdController::class, 'lookup']);
 Route::post('/accounts', [UssdController::class, 'accounts']);
 Route::post('/balance', [UssdController::class, 'balance']);
 Route::post('/recharge/initiate', [UssdRechargeController::class, 'initiate']);
+Route::post('/recharge/otp', [UssdRechargeController::class, 'submitOtp']);
 Route::get('/recharge/status/{reference}', [UssdRechargeController::class, 'status']);
 Route::post('/recharge/confirm', [UssdRechargeController::class, 'confirm']);

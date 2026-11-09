@@ -17,6 +17,11 @@ class FakePaymentProvider implements PaymentProvider
         return $this->resolve($intent);
     }
 
+    public function submitOtp(UssdPaymentIntent $intent, string $otp): PaymentResult
+    {
+        return $this->resolve($intent);
+    }
+
     private function resolve(UssdPaymentIntent $intent): PaymentResult
     {
         $outcome = strtolower((string) config('services.ussd.fake_payment_outcome', 'success'));

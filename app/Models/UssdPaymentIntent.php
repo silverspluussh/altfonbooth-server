@@ -24,6 +24,7 @@ class UssdPaymentIntent extends Model
         'provider',
         'external_ref',
         'status',
+        'requires_otp',
         'failure_reason',
         'topup_attempts',
         'paid_at',
@@ -33,6 +34,7 @@ class UssdPaymentIntent extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'requires_otp' => 'boolean',
             'topup_attempts' => 'integer',
             'paid_at' => 'datetime',
         ];
