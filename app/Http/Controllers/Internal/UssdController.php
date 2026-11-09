@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SubscriberAuthModel;
 use App\Models\SubscribersModel;
 use App\Services\BoothApiService;
+use App\Services\UssdSignupSmsService;
 use App\Services\UssdSubscriberService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,7 @@ class UssdController extends Controller
     public function __construct(
         private BoothApiService $booth,
         private UssdSubscriberService $subscribers,
+        private UssdSignupSmsService $signupSms,
     ) {
     }
 
@@ -35,6 +37,8 @@ class UssdController extends Controller
         $subscriber = $this->subscribers->resolve($local);
 
         if (!$subscriber) {
+            $this->signupSms->notify($local, UssdSignupSmsService::REASON_NOT_REGISTERED);
+
             return response()->json([
                 'status' => true,
                 'data' => [
@@ -44,6 +48,15 @@ class UssdController extends Controller
                     'duplicateMatches' => $duplicateMatches,
                 ],
             ]);
+        }
+
+        $accounts = $this->subscribers->accountSummaries($subscriber);
+        $active = $this->subscribers->isActive($subscriber);
+
+        if (!$active) {
+            $this->signupSms->notify($local, UssdSignupSmsService::REASON_INACTIVE);
+        } elseif ($accounts->isEmpty()) {
+            $this->signupSms->notify($local, UssdSignupSmsService::REASON_NO_NUMBER);
         }
 
         return response()->json([
@@ -56,7 +69,7 @@ class UssdController extends Controller
                     'status' => $this->subscribers->status($subscriber),
                     'defaultAuthusername' => $subscriber->authusername,
                 ],
-                'accounts' => $this->subscribers->accountSummaries($subscriber),
+                'accounts' => $accounts,
                 'duplicateMatches' => $duplicateMatches,
             ],
         ]);

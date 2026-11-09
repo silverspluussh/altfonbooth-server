@@ -2,11 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SendOtpSmsJob;
 use App\Models\SubscriberAuthModel;
 use App\Models\SubscribersModel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class InternalUssdApiTest extends TestCase
@@ -17,9 +20,15 @@ class InternalUssdApiTest extends TestCase
     {
         parent::setUp();
 
+        Queue::fake();
+        Cache::flush();
+
         config([
             'services.ussd.internal_token' => 'test-internal-token',
             'services.ussd.internal_ip_allowlist' => [],
+            'services.ussd.signup_url' => 'https://www.altfon.com',
+            'services.ussd.signup_sms_ttl_seconds' => 86400,
+            'services.ussd.signup_sms_delay_seconds' => 5,
         ]);
     }
 
@@ -259,5 +268,66 @@ class InternalUssdApiTest extends TestCase
             ]);
 
         $this->getJson('/api/user')->assertStatus(401);
+    }
+
+    public function test_unregistered_lookup_queues_a_signup_sms_once(): void
+    {
+        $this->internal()->postJson('/api/internal/ussd/lookup', [
+            'msisdn' => '0240000000',
+        ])->assertOk();
+
+        Queue::assertPushed(SendOtpSmsJob::class, function (SendOtpSmsJob $job) {
+            return $job->phone === '0240000000'
+                && str_contains($job->message, 'https://www.altfon.com')
+                && str_contains($job->message, 'does not have an Altfon account');
+        });
+
+        // Same number within the 24-hour window: no second SMS.
+        $this->internal()->postJson('/api/internal/ussd/lookup', [
+            'msisdn' => '0240000000',
+        ])->assertOk();
+
+        Queue::assertPushedTimes(SendOtpSmsJob::class, 1);
+    }
+
+    public function test_inactive_account_lookup_queues_a_help_sms(): void
+    {
+        $subscriber = $this->createSubscriber();
+        $subscriber->update(['billing_acc_status' => 'suspended']);
+
+        $this->internal()->postJson('/api/internal/ussd/lookup', [
+            'msisdn' => '0249335549',
+        ])->assertOk()->assertJsonPath('data.registered', true);
+
+        Queue::assertPushed(SendOtpSmsJob::class, function (SendOtpSmsJob $job) {
+            return str_contains($job->message, 'not active')
+                && str_contains($job->message, 'https://www.altfon.com');
+        });
+    }
+
+    public function test_account_without_a_number_queues_a_help_sms(): void
+    {
+        $this->createSubscriber();
+
+        $this->internal()->postJson('/api/internal/ussd/lookup', [
+            'msisdn' => '0249335549',
+        ])->assertOk()->assertJsonPath('data.registered', true);
+
+        Queue::assertPushed(SendOtpSmsJob::class, function (SendOtpSmsJob $job) {
+            return str_contains($job->message, 'No Altfon number')
+                && str_contains($job->message, 'https://www.altfon.com');
+        });
+    }
+
+    public function test_registered_account_lookup_does_not_queue_a_signup_sms(): void
+    {
+        $this->createSubscriber();
+        $this->createAccount('SUB_USSD1', '7022875');
+
+        $this->internal()->postJson('/api/internal/ussd/lookup', [
+            'msisdn' => '0249335549',
+        ])->assertOk()->assertJsonPath('data.registered', true);
+
+        Queue::assertNotPushed(SendOtpSmsJob::class);
     }
 }

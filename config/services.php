@@ -47,6 +47,9 @@ return [
         'payment_provider' => env('USSD_PAYMENT_PROVIDER', 'fake'),
         'fake_payment_outcome' => env('USSD_FAKE_PAYMENT_OUTCOME', 'success'),
         'fake_payment_delay_seconds' => (int) env('USSD_FAKE_PAYMENT_DELAY_SECONDS', 2),
+        'signup_url' => env('USSD_SIGNUP_URL', 'https://www.altfon.com'),
+        'signup_sms_ttl_seconds' => (int) env('USSD_SIGNUP_SMS_TTL_SECONDS', 86400),
+        'signup_sms_delay_seconds' => (int) env('USSD_SIGNUP_SMS_DELAY_SECONDS', 5),
     ],
 
 ];
