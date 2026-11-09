@@ -12,6 +12,7 @@ use App\Models\SubscriberAuthModel;
 use App\Models\SubscriberDestModel;
 use App\Models\PrepaidCredit;
 use App\Services\BoothApiService;
+use App\Support\Msisdn;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -130,7 +131,7 @@ class AdminController extends Controller
             'fullname' => $request->fullname,
             'username' => $request->username,
             'emailaddress' => $request->emailaddress,
-            'phonenumber' => $request->phonenumber,
+            'phonenumber' => Msisdn::toStorage($request->phonenumber),
             'country' => $request->country,
             'password' => Hash::make($request->password),
         ]);
@@ -161,6 +162,9 @@ class AdminController extends Controller
         ]);
 
         $data = $request->only(['fullname', 'username', 'emailaddress', 'phonenumber', 'country', 'switch_status', 'billing_acc_status']);
+        if ($request->has('phonenumber')) {
+            $data['phonenumber'] = Msisdn::toStorage($request->input('phonenumber'));
+        }
         if ($request->filled('password')) {
             $data['password'] = Hash::make($request->password);
         }

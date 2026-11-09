@@ -31,4 +31,53 @@ final class Msisdn
 
         return $local === null ? null : '233' . substr($local, 1);
     }
+
+    /**
+     * Canonical format for persisting a phone number.
+     *
+     * Ghanaian numbers are stored in the local form the USSD lookup queries
+     * (0XXXXXXXXX). Anything else is reduced to digits so repeated lookups
+     * stay consistent, with the trimmed input kept as a last resort.
+     */
+    public static function toStorage(?string $value): ?string
+    {
+        $trimmed = trim((string) $value);
+
+        if ($trimmed === '') {
+            return null;
+        }
+
+        $local = self::normalize($trimmed);
+
+        if ($local !== null) {
+            return $local;
+        }
+
+        $digits = preg_replace('/\D+/', '', $trimmed) ?? '';
+
+        return $digits !== '' ? $digits : $trimmed;
+    }
+
+    /**
+     * Stored values a lookup should match, including the raw input so rows
+     * written before normalization still resolve during rollout.
+     */
+    public static function storageCandidates(?string $value): array
+    {
+        $trimmed = trim((string) $value);
+
+        if ($trimmed === '') {
+            return [];
+        }
+
+        $candidates = [$trimmed];
+
+        $storage = self::toStorage($trimmed);
+
+        if ($storage !== null) {
+            $candidates[] = $storage;
+        }
+
+        return array_values(array_unique($candidates));
+    }
 }

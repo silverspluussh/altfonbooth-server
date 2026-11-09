@@ -8,6 +8,7 @@ use App\Models\SubscribersModel;
 use App\Models\SubscribersTempModel;
 use App\Models\VoiceRelay;
 use App\Services\BoothApiService;
+use App\Support\Msisdn;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -42,10 +43,20 @@ class AuthController extends Controller
 
         $fullname = $this->resolveFullname($request);
         $emailaddress = $request->input('emailaddress') ?? $request->input('email');
+        $phonenumber = Msisdn::toStorage($request->input('phonenumber'));
+        $phoneCandidates = Msisdn::storageCandidates($request->input('phonenumber'));
+
+        if ($phonenumber === null) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation errors',
+                'errors' => ['phonenumber' => ['A valid phone number is required.']],
+            ], 422);
+        }
 
         // A fully-registered account must not be created twice; tell the user to sign in.
         $existingSubscriber = SubscribersModel::where('username', $request->username)
-            ->orWhere('phonenumber', $request->phonenumber)
+            ->orWhereIn('phonenumber', $phoneCandidates)
             ->when($emailaddress, fn ($q) => $q->orWhere('emailaddress', $emailaddress))
             ->first();
 
@@ -62,7 +73,7 @@ class AuthController extends Controller
             'fullname' => $fullname,
             'username' => $request->username,
             'password' => Hash::make($request->password),
-            'phonenumber' => $request->phonenumber,
+            'phonenumber' => $phonenumber,
             'emailaddress' => $emailaddress,
             'country' => $request->country,
             'otp' => $otp,
@@ -73,7 +84,7 @@ class AuthController extends Controller
         // Reuse a still-pending registration (missed/expired OTP, re-submit) instead
         // of failing on a duplicate row that the user cannot clear themselves.
         $pending = SubscribersTempModel::where('username', $request->username)
-            ->orWhere('phonenumber', $request->phonenumber)
+            ->orWhereIn('phonenumber', $phoneCandidates)
             ->when($emailaddress, fn ($q) => $q->orWhere('emailaddress', $emailaddress))
             ->latest()
             ->first();
@@ -86,7 +97,7 @@ class AuthController extends Controller
             ] + $attributes);
         }
 
-        queue_otp_sms($request->phonenumber, "Your OTP Code: $otp");
+        queue_otp_sms($phonenumber, "Your OTP Code: $otp");
 
         if ($emailaddress) {
             send_email_otp($emailaddress, $otp);
@@ -114,9 +125,10 @@ class AuthController extends Controller
         }
 
         $otp = $request->input('otp') ?? $request->input('code');
+        $phoneCandidates = Msisdn::storageCandidates($request->phonenumber);
 
         $temp = SubscribersTempModel::query()
-            ->when($request->phonenumber, fn ($q) => $q->where('phonenumber', $request->phonenumber))
+            ->when($phoneCandidates !== [], fn ($q) => $q->whereIn('phonenumber', $phoneCandidates))
             ->when($request->subscriberid, fn ($q) => $q->where('subscriberid', $request->subscriberid))
             ->where('otp', $otp)
             ->where('status', 'pending')
@@ -132,7 +144,7 @@ class AuthController extends Controller
         }
 
         $existing = SubscribersModel::where('username', $temp->username)
-            ->orWhere('phonenumber', $temp->phonenumber)
+            ->orWhereIn('phonenumber', Msisdn::storageCandidates($temp->phonenumber))
             ->first();
         if ($existing) {
             return response()->json(['status' => false, 'message' => 'Subscriber already registered'], 409);
@@ -144,7 +156,7 @@ class AuthController extends Controller
             'fullname' => $temp->fullname,
             'username' => $temp->username,
             'password' => $temp->password,
-            'phonenumber' => $temp->phonenumber,
+            'phonenumber' => Msisdn::toStorage($temp->phonenumber) ?? $temp->phonenumber,
             'emailaddress' => $temp->emailaddress,
             'country' => $temp->country,
             'authusername' => null,
@@ -177,9 +189,11 @@ class AuthController extends Controller
 
         $identifier = trim($request->username);
 
+        $phoneCandidates = Msisdn::storageCandidates($identifier);
+
         $tempUser = SubscribersTempModel::where('username', $identifier)
             ->orWhere('emailaddress', $identifier)
-            ->orWhere('phonenumber', $identifier)
+            ->when($phoneCandidates !== [], fn ($q) => $q->orWhereIn('phonenumber', $phoneCandidates))
             ->latest()
             ->first();
 
@@ -278,7 +292,10 @@ class AuthController extends Controller
         $subscriber = null;
 
         if ($request->filled('phonenumber')) {
-            $subscriber = SubscribersModel::where('phonenumber', $request->phonenumber)->first();
+            $subscriber = SubscribersModel::whereIn(
+                'phonenumber',
+                Msisdn::storageCandidates($request->phonenumber)
+            )->first();
         } else {
             $email = $request->input('email') ?? $request->input('emailaddress');
             $subscriber = SubscribersModel::where('emailaddress', $email)->first();
@@ -388,7 +405,7 @@ class AuthController extends Controller
         $payload = [
             'email' => $subscriber->emailaddress,
             'name' => $subscriber->fullname,
-            'phone' => $subscriber->phonenumber,
+            'phone' => Msisdn::toInternational($subscriber->phonenumber) ?? $subscriber->phonenumber,
             'authusername' => $auth->authusername,
             'authpassword' => $auth->authpassword,
             'domain' => $relay->domain ?? '',

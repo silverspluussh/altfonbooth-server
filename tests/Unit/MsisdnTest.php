@@ -31,4 +31,36 @@ class MsisdnTest extends TestCase
         $this->assertNull(Msisdn::normalize('12345'));
         $this->assertNull(Msisdn::normalize('abc'));
     }
+
+    public function test_it_normalizes_ghana_numbers_for_storage(): void
+    {
+        $this->assertSame('0249335549', Msisdn::toStorage('0249335549'));
+        $this->assertSame('0249335549', Msisdn::toStorage('+233249335549'));
+        $this->assertSame('0249335549', Msisdn::toStorage('233 24 933 5549'));
+        $this->assertSame('0249335549', Msisdn::toStorage('00233249335549'));
+        $this->assertSame('0249335549', Msisdn::toStorage('249335549'));
+    }
+
+    public function test_it_reduces_other_numbers_to_digits(): void
+    {
+        $this->assertSame('2348012345678', Msisdn::toStorage('+234 801 234 5678'));
+        $this->assertSame('12025550123', Msisdn::toStorage('+1 (202) 555-0123'));
+    }
+
+    public function test_storage_handles_blank_values(): void
+    {
+        $this->assertNull(Msisdn::toStorage(null));
+        $this->assertNull(Msisdn::toStorage('   '));
+        $this->assertSame([], Msisdn::storageCandidates(null));
+    }
+
+    public function test_storage_candidates_include_raw_and_normalized_values(): void
+    {
+        $this->assertSame(
+            ['+233249335549', '0249335549'],
+            Msisdn::storageCandidates('+233249335549')
+        );
+
+        $this->assertSame(['0249335549'], Msisdn::storageCandidates('0249335549'));
+    }
 }
