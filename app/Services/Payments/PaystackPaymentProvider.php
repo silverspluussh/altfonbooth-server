@@ -7,6 +7,7 @@ use App\Models\SubscribersModel;
 use App\Models\UssdPaymentIntent;
 use App\Support\Msisdn;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 
@@ -76,14 +77,26 @@ class PaystackPaymentProvider implements PaymentProvider
         }
 
         $body = $response->json();
-        $ok = $response->successful() && is_array($body) && ($body['status'] ?? false) === true;
 
-        if (!$ok) {
+        if (!$response->successful()) {
             $message = is_array($body) && isset($body['message'])
                 ? (string) $body['message']
                 : 'Paystack request failed.';
 
+            Log::warning('Paystack request failed', [
+                'path' => $path,
+                'http_status' => $response->status(),
+                'message' => $message,
+                'code' => is_array($body) ? ($body['code'] ?? null) : null,
+                'type' => is_array($body) ? ($body['type'] ?? null) : null,
+                'next_step' => is_array($body) ? ($body['meta']['nextStep'] ?? null) : null,
+            ]);
+
             throw new RuntimeException($message);
+        }
+
+        if (!is_array($body)) {
+            throw new RuntimeException('Paystack returned an invalid response.');
         }
 
         return $body;
@@ -92,8 +105,39 @@ class PaystackPaymentProvider implements PaymentProvider
     private function mapCharge(array $body, UssdPaymentIntent $intent): PaymentResult
     {
         $data = is_array($body['data'] ?? null) ? $body['data'] : [];
+
+        if ($data === []) {
+            $message = (string) ($body['message'] ?? 'Paystack returned an empty charge response.');
+
+            Log::warning('Paystack charge response without data', [
+                'reference' => $intent->reference,
+                'top_status' => $body['status'] ?? null,
+                'message' => $message,
+                'code' => $body['code'] ?? null,
+                'type' => $body['type'] ?? null,
+                'next_step' => $body['meta']['nextStep'] ?? null,
+            ]);
+
+            throw new RuntimeException($message);
+        }
+
         $status = strtolower((string) ($data['status'] ?? 'pending'));
         $externalRef = (string) ($data['id'] ?? $data['reference'] ?? $intent->reference);
+
+        $context = [
+            'reference' => $intent->reference,
+            'top_status' => $body['status'] ?? null,
+            'data_status' => $status,
+            'gateway_response' => $data['gateway_response'] ?? null,
+            'message' => $data['message'] ?? null,
+            'paystack_message' => $body['message'] ?? null,
+        ];
+
+        if (in_array($status, ['failed', 'reversed', 'abandoned'], true)) {
+            Log::warning('Paystack charge declined', $context);
+        } else {
+            Log::info('Paystack charge response', $context);
+        }
 
         return match (true) {
             $status === 'success' => PaymentResult::completed(
@@ -107,7 +151,7 @@ class PaystackPaymentProvider implements PaymentProvider
                 $status,
             ),
             in_array($status, ['failed', 'reversed', 'abandoned'], true) => PaymentResult::failed(
-                $this->failureMessage($data),
+                $this->failureMessage($data, $body),
                 $externalRef,
                 $status,
             ),
@@ -119,9 +163,14 @@ class PaystackPaymentProvider implements PaymentProvider
         };
     }
 
-    private function failureMessage(array $data): string
+    private function failureMessage(array $data, array $body): string
     {
-        $message = trim((string) ($data['gateway_response'] ?? $data['message'] ?? ''));
+        $message = trim((string) (
+            $data['gateway_response']
+            ?? $data['message']
+            ?? $body['message']
+            ?? ''
+        ));
 
         return $message !== '' ? $message : 'Payment failed or was cancelled.';
     }

@@ -315,4 +315,52 @@ class PaystackRechargeTest extends TestCase
             'status' => UssdPaymentIntent::STATUS_PENDING,
         ]);
     }
+
+    public function test_a_declined_charge_returns_a_failed_intent_not_a_start_error(): void
+    {
+        $this->createSubscriber();
+
+        Http::fake([
+            '*/charge' => Http::response([
+                'status' => false,
+                'message' => 'Charge attempted',
+                'type' => 'processor_error',
+                'code' => 'charge_failed',
+                'data' => [
+                    'id' => 111,
+                    'status' => 'failed',
+                    'reference' => 'ALT-DECLINED-1',
+                    'gateway_response' => 'Declined. Please use the test mobile money number since you are doing a test transaction.',
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->internal()->postJson('/api/internal/ussd/recharge/initiate', [
+            'msisdn' => '0249335549',
+            'authusername' => '7022875',
+            'amount' => 5,
+            'network' => 'MTN',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.state', UssdPaymentIntent::STATUS_FAILED)
+            ->assertJsonPath('data.requiresOtp', false);
+
+        $reference = $response->json('data.reference');
+
+        $this->assertDatabaseHas('ussd_payment_intents', [
+            'reference' => $reference,
+            'status' => UssdPaymentIntent::STATUS_FAILED,
+        ]);
+
+        $this->assertStringContainsString(
+            'Declined',
+            (string) UssdPaymentIntent::where('reference', $reference)->value('failure_reason')
+        );
+
+        $this->assertSame(
+            0,
+            DB::table('prepaid_credits')->where('transaction_id', $reference)->count()
+        );
+    }
 }

@@ -436,8 +436,9 @@ class InternalUssdRechargeApiTest extends TestCase
         config(['services.ussd.fake_payment_outcome' => 'failed']);
 
         $this->initiate()
-            ->assertStatus(502)
-            ->assertJson(['status' => false, 'code' => 'PAYMENT_INIT_FAILED']);
+            ->assertOk()
+            ->assertJsonPath('data.state', UssdPaymentIntent::STATUS_FAILED)
+            ->assertJsonPath('data.requiresOtp', false);
 
         $this->assertDatabaseHas('ussd_payment_intents', [
             'status' => UssdPaymentIntent::STATUS_FAILED,

@@ -100,7 +100,14 @@ class UssdPaymentService
                 'requires_otp' => false,
             ]);
 
-            throw new PaymentInitFailedException($result->message);
+            Log::warning('USSD payment declined by provider', [
+                'reference' => $intent->reference,
+                'provider' => $intent->provider,
+                'reason' => $result->message,
+                'provider_status' => $result->providerStatus,
+            ]);
+
+            return $intent->refresh();
         }
 
         if ($result->state === UssdPaymentIntent::STATUS_COMPLETED) {
@@ -151,6 +158,13 @@ class UssdPaymentService
                 'failure_reason' => $result->message,
                 'external_ref' => $result->externalRef ?: $intent->external_ref,
                 'requires_otp' => false,
+            ]);
+
+            Log::warning('USSD payment declined during reconciliation', [
+                'reference' => $intent->reference,
+                'provider' => $intent->provider,
+                'reason' => $result->message,
+                'provider_status' => $result->providerStatus,
             ]);
 
             return $intent->refresh();
@@ -212,6 +226,13 @@ class UssdPaymentService
                 'failure_reason' => $result->message,
                 'external_ref' => $result->externalRef ?: $intent->external_ref,
                 'requires_otp' => false,
+            ]);
+
+            Log::warning('USSD payment OTP declined by provider', [
+                'reference' => $intent->reference,
+                'provider' => $intent->provider,
+                'reason' => $result->message,
+                'provider_status' => $result->providerStatus,
             ]);
 
             return $intent->refresh();
@@ -377,6 +398,13 @@ class UssdPaymentService
                 'failure_reason' => null,
                 'topup_attempts' => $attempts,
             ]);
+
+            $amount = number_format((float) $intent->amount, 2, '.', '');
+
+            DB::afterCommit(fn () => queue_otp_sms(
+                $intent->msisdn,
+                "Altfon: Your recharge of GHS {$amount} was successful.",
+            ));
 
             return true;
         }
