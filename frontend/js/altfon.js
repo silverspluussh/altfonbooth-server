@@ -4,31 +4,6 @@ const CONFIG = {
     APP_NAME: 'Altfon Booth'
 };
 
-// Authentication Helpers
-const Auth = {
-    setToken(token) {
-        localStorage.setItem('altfon_token', token);
-    },
-    getToken() {
-        return localStorage.getItem('altfon_token');
-    },
-    setUser(user) {
-        localStorage.setItem('altfon_user', JSON.stringify(user));
-    },
-    getUser() {
-        const user = localStorage.getItem('altfon_user');
-        return user ? JSON.parse(user) : null;
-    },
-    logout() {
-        localStorage.removeItem('altfon_token');
-        localStorage.removeItem('altfon_user');
-        window.location.href = 'login';
-    },
-    isAuthenticated() {
-        return !!this.getToken();
-    }
-};
-
 // UI Utilities
 const UI = {
     showToast(message, type = 'success') {
@@ -96,47 +71,70 @@ const UI = {
     }
 };
 
+// Subscriber session: JWT lifecycle, refresh, idle timeout and cross-tab sync.
+const sessionPage = (window.location.pathname.split('/').pop() || '').toLowerCase();
+const sessionProtectedPages = [
+    'dashboard',
+    'dashboard.html',
+    'my-account',
+    'my-account.html',
+    'checkout',
+    'checkout.html'
+];
+const sessionIsProtected = sessionProtectedPages.includes(sessionPage);
+
+const UserSession = new SessionManager({
+    apiBase: CONFIG.API_BASE,
+    tokenKey: 'altfon_token',
+    userKey: 'altfon_user',
+    refreshPath: '/refresh',
+    logoutPath: '/logout',
+    loginUrl: 'login',
+    // Idle logout only applies to signed-in app pages, not the public site.
+    idleMs: sessionIsProtected ? 30 * 60 * 1000 : 0,
+    warningMs: sessionIsProtected ? 28 * 60 * 1000 : 0,
+    refreshLeadMs: 15 * 60 * 1000,
+    toast: (message, type) => UI.showToast(message, type),
+    onExpire: () => {
+        if (!sessionIsProtected) return;
+
+        const next = encodeURIComponent(`${sessionPage}${window.location.search}`);
+        setTimeout(() => {
+            window.location.href = `login?expired=1&next=${next}`;
+        }, 1200);
+    }
+});
+
+UserSession.init();
+
+// Backwards-compatible authentication helpers used across the site.
+const Auth = {
+    setToken(token) {
+        UserSession.setToken(token);
+    },
+    getToken() {
+        return UserSession.getToken();
+    },
+    setUser(user) {
+        UserSession.setUser(user);
+    },
+    getUser() {
+        return UserSession.getUser();
+    },
+    setSession(token, user) {
+        UserSession.setSession(token, user);
+    },
+    logout() {
+        return UserSession.logout({ redirect: true });
+    },
+    isAuthenticated() {
+        return UserSession.isAuthenticated();
+    }
+};
+
 // Global Request Wrapper
 async function apiRequest(endpoint, options = {}) {
-    const token = Auth.getToken();
-
-    const defaultHeaders = {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-    };
-
-    if (token) {
-        defaultHeaders['Authorization'] = `Bearer ${token}`;
-    }
-
-    const method = (options.method || 'GET').toUpperCase();
-
-    const response = await fetch(`${CONFIG.API_BASE}${endpoint}`, {
-        ...options,
-        headers: {
-            ...defaultHeaders,
-            ...options.headers
-        }
-    });
-
-    const data = await response.json();
-
-    console.log(`[API] ${method} ${endpoint} → ${response.status}`, data);
-
-    // Handle rate limiting (429)
-    if (response.status === 429) {
-        throw new Error(data.message || 'Too many requests. Please wait a moment and try again.');
-    }
-
-    if (!response.ok) {
-        if (response.status === 401) {
-            // Throw with the exact Laravel message so callers can detect auth failures
-            throw new Error(data.message || 'Unauthenticated.');
-        }
-        throw new Error(data.message || 'Something went wrong');
-    }
-
-    return data;
+    return UserSession.request(endpoint, options);
 }
 
 // Auto-init navigation on load

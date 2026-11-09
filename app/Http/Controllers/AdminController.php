@@ -45,11 +45,50 @@ class AdminController extends Controller
         }
 
         $token = auth('admin-api')->login($admin);
+        $ttl = (int) config('jwt.ttl', 720);
 
         return response()->json([
             'status' => true,
             'token' => $token,
+            'expires_in' => $ttl * 60,
+            'expires_at' => now()->addMinutes($ttl)->toIso8601String(),
             'admin' => new AdminResource($admin)
+        ]);
+    }
+
+    public function refresh(): JsonResponse
+    {
+        try {
+            $token = auth('admin-api')->refresh();
+        } catch (\Throwable $exception) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Session expired. Please log in again.',
+            ], 401);
+        }
+
+        $ttl = (int) config('jwt.ttl', 720);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Session refreshed',
+            'token' => $token,
+            'expires_in' => $ttl * 60,
+            'expires_at' => now()->addMinutes($ttl)->toIso8601String(),
+        ]);
+    }
+
+    public function logout(): JsonResponse
+    {
+        try {
+            auth('admin-api')->logout();
+        } catch (\Throwable $exception) {
+            // Ignore expired/blacklisted tokens; the client session is cleared.
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Logged out',
         ]);
     }
 

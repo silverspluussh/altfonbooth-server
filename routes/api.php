@@ -17,6 +17,13 @@ Route::middleware('throttle:5,1')->group(function () {
     Route::post('/password/reset', [AuthController::class, 'resetPassword']);
 });
 
+// Session lifecycle — Bearer token required, but no auth middleware so an
+// expired access token can still be refreshed within the refresh window.
+Route::middleware('throttle:60,1')->group(function () {
+    Route::post('/refresh', [AuthController::class, 'refresh']);
+    Route::post('/logout', [AuthController::class, 'logout']);
+});
+
 // Protected Routes — Standard rate limit: 60 requests per minute
 Route::middleware(['auth:api', 'throttle:60,1'])->group(function () {
     // Current Authenticated User (Subscriber)
@@ -66,6 +73,11 @@ Route::get('/payments/config', [SubscribersController::class, 'getPaymentConfig'
 Route::prefix('admin')->group(function () {
     Route::middleware('throttle:5,1')->group(function () {
         Route::post('/login', [AdminController::class, 'login']);
+    });
+
+    Route::middleware('throttle:60,1')->group(function () {
+        Route::post('/refresh', [AdminController::class, 'refresh']);
+        Route::post('/logout', [AdminController::class, 'logout']);
     });
 
     Route::middleware(['auth:admin-api', 'admin.role:manager', 'throttle:60,1'])->group(function () {

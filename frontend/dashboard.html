@@ -477,6 +477,7 @@
   </div>
 
   <script src="js/jquery.js"></script>
+  <script src="js/session.js"></script>
   <script src="js/altfon.js"></script>
   <script>
     let currentUser = null;
@@ -574,7 +575,12 @@
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
     async function init() {
-      if (!Auth.isAuthenticated()) { window.location.href = 'login'; return; }
+      const active = await UserSession.ready();
+
+      if (!active) {
+        window.location.href = 'login?expired=1&next=' + encodeURIComponent('dashboard');
+        return;
+      }
       
       // Reset loaders
       document.getElementById('authLoader').style.display = 'flex';
@@ -621,20 +627,14 @@
         } catch (configErr) {
           console.warn('Could not load payment config:', configErr.message);
         }
-      } catch (error) { 
+      } catch (error) {
         console.error(error);
-        if (error.message === 'Unauthenticated.' || error.message === 'Unauthenticated') {
-          if (window.__paymentJustCompleted) {
-            // Payment was processed — redirect gracefully instead of harsh logout
-            UI.showToast('Payment successful! Please login to continue.', 'success');
-            setTimeout(() => Auth.logout(), 2000);
-          } else {
-            UI.showToast('Session expired. Please log in again.', 'error');
-            setTimeout(() => Auth.logout(), 2000);
-          }
-        } else {
-          UI.showToast('Error loading dashboard: ' + error.message, 'error');
+
+        if (error && error.name === 'SessionExpiredError') {
+          return;
         }
+
+        UI.showToast('Error loading dashboard: ' + error.message, 'error');
       }
     }
 
@@ -831,6 +831,8 @@
             // No auth required — works even if JWT expired during Paystack redirect
             const verifyRes = await apiRequest('/payments/verify', {
               method: 'POST',
+              auth: false,
+              retryOnUnauthorized: false,
               body: JSON.stringify({ reference: paystackRef })
             });
 
@@ -842,7 +844,6 @@
                 verifyRes.pending ? 'info' : 'success'
               );
               localStorage.removeItem('pendingPayment');
-              window.__paymentJustCompleted = true;
             } else {
               UI.showToast(verifyRes.message || 'Payment verification failed', 'error');
             }

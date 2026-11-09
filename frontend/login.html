@@ -108,6 +108,7 @@
 </footer>
 
 <script src="js/jquery.js"></script>
+<script src="js/session.js"></script>
 <script src="js/altfon.js"></script>
 <script>
     function togglePassword(id, icon) {
@@ -123,6 +124,34 @@
         }
     }
 
+    function nextPage() {
+        const raw = new URLSearchParams(window.location.search).get('next');
+
+        if (!raw) return 'dashboard';
+
+        try {
+            const decoded = decodeURIComponent(raw);
+            if (/^[a-zA-Z0-9_./-]+$/.test(decoded) && !decoded.startsWith('//')) {
+                return decoded;
+            }
+        } catch (error) {
+            // Ignore malformed redirect targets.
+        }
+
+        return 'dashboard';
+    }
+
+    UserSession.ready().then((active) => {
+        if (active) {
+            window.location.href = nextPage();
+            return;
+        }
+
+        if (new URLSearchParams(window.location.search).get('expired')) {
+            UI.showToast('Your session expired. Please log in again.', 'error');
+        }
+    });
+
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = e.target.querySelector('button');
@@ -132,18 +161,19 @@
         try {
             const response = await apiRequest('/login', {
                 method: 'POST',
+                retryOnUnauthorized: false,
+                auth: false,
                 body: JSON.stringify({
                     username: document.getElementById('identifier').value,
                     password: document.getElementById('password').value
                 })
             });
 
-            Auth.setToken(response.token);
-            Auth.setUser(response.user);
+            UserSession.setSession(response.token, response.user);
             UI.showToast('Login successful! Redirecting...');
-            
+
             setTimeout(() => {
-                window.location.href = 'dashboard';
+                window.location.href = nextPage();
             }, 1000);
 
         } catch (error) {

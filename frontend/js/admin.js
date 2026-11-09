@@ -1,66 +1,54 @@
-// Admin Authentication (separate from subscriber Auth)
-const AdminAuth = {
-    TOKEN_KEY: 'altfon_admin_token',
-    USER_KEY: 'altfon_admin_user',
+// Admin session: separate JWT lifecycle from the subscriber session.
+const AdminSession = new SessionManager({
+    apiBase: CONFIG.API_BASE,
+    tokenKey: 'altfon_admin_token',
+    userKey: 'altfon_admin_user',
+    refreshPath: '/admin/refresh',
+    logoutPath: '/admin/logout',
+    loginUrl: 'admin#login',
+    idleMs: 15 * 60 * 1000,
+    warningMs: 13 * 60 * 1000,
+    refreshLeadMs: 10 * 60 * 1000,
+    toast: (message, type) => UI.showToast(message, type),
+    onExpire: () => {
+        const app = document.getElementById('app-view');
+        const login = document.getElementById('login-view');
+        if (app) app.style.display = 'none';
+        if (login) login.style.display = 'flex';
+        window.location.hash = 'login';
+    }
+});
 
+const AdminAuth = {
     setToken(token) {
-        localStorage.setItem(this.TOKEN_KEY, token);
+        AdminSession.setToken(token);
     },
     getToken() {
-        return localStorage.getItem(this.TOKEN_KEY);
+        return AdminSession.getToken();
     },
     setUser(user) {
-        localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+        AdminSession.setUser(user);
     },
     getUser() {
-        const user = localStorage.getItem(this.USER_KEY);
-        return user ? JSON.parse(user) : null;
+        return AdminSession.getUser();
     },
-    logout() {
-        localStorage.removeItem(this.TOKEN_KEY);
-        localStorage.removeItem(this.USER_KEY);
+    setSession(token, user) {
+        AdminSession.setSession(token, user);
+    },
+    async logout() {
+        await AdminSession.logout({ redirect: false });
         AdminRouter.navigate('login');
         document.getElementById('app-view').style.display = 'none';
         document.getElementById('login-view').style.display = 'flex';
     },
     isAuthenticated() {
-        return !!this.getToken();
+        return AdminSession.isAuthenticated();
     }
 };
 
 // Admin API Request
 async function adminApiRequest(endpoint, options = {}) {
-    const token = AdminAuth.getToken();
-    const defaultHeaders = {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-    };
-    if (token) {
-        defaultHeaders['Authorization'] = `Bearer ${token}`;
-    }
-
-    const method = (options.method || 'GET').toUpperCase();
-    const response = await fetch(`${CONFIG.API_BASE}${endpoint}`, {
-        ...options,
-        headers: { ...defaultHeaders, ...options.headers }
-    });
-
-    const data = await response.json();
-
-    if (response.status === 429) {
-        throw new Error(data.message || 'Too many requests. Please wait.');
-    }
-
-    if (response.status === 401) {
-        AdminAuth.logout();
-        throw new Error('Session expired. Please login again.');
-    }
-
-    if (!response.ok) {
-        throw new Error(data.message || 'Something went wrong');
-    }
-
-    return data;
+    return AdminSession.request(endpoint, options);
 }
 
 // Router
@@ -860,10 +848,11 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const res = await adminApiRequest('/admin/login', {
                     method: 'POST',
+                    retryOnUnauthorized: false,
+                    auth: false,
                     body: JSON.stringify({ username, password })
                 });
-                AdminAuth.setToken(res.token);
-                AdminAuth.setUser(res.admin);
+                AdminAuth.setSession(res.token, res.admin);
                 AdminRouter.navigate('dashboard');
                 document.getElementById('login-view').style.display = 'none';
                 document.getElementById('app-view').style.display = 'flex';
@@ -895,10 +884,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Init router
-    if (AdminAuth.isAuthenticated()) {
-        AdminRouter.init();
-    } else {
-        renderLogin();
-    }
+    // Init router after the session manager has settled any refresh.
+    AdminSession.init().then((active) => {
+        if (active) {
+            AdminRouter.init();
+        } else {
+            renderLogin();
+        }
+    });
 });

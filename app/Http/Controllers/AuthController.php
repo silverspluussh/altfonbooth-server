@@ -229,12 +229,52 @@ class AuthController extends Controller
         }
 
         $token = auth('api')->login($subscriber);
+        $ttl = (int) config('jwt.ttl', 720);
 
         return response()->json([
             'status' => true,
             'message' => 'Login successful',
             'token' => $token,
+            'expires_in' => $ttl * 60,
+            'expires_at' => now()->addMinutes($ttl)->toIso8601String(),
             'user' => new SubscriberResource($subscriber)
+        ]);
+    }
+
+    public function refresh(): JsonResponse
+    {
+        try {
+            $token = auth('api')->refresh();
+        } catch (\Throwable $exception) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Session expired. Please log in again.',
+            ], 401);
+        }
+
+        $ttl = (int) config('jwt.ttl', 720);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Session refreshed',
+            'token' => $token,
+            'expires_in' => $ttl * 60,
+            'expires_at' => now()->addMinutes($ttl)->toIso8601String(),
+        ]);
+    }
+
+    public function logout(): JsonResponse
+    {
+        try {
+            auth('api')->logout();
+        } catch (\Throwable $exception) {
+            // The token may already be expired or blacklisted; clearing the
+            // client session is still the correct outcome.
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Logged out',
         ]);
     }
 

@@ -95,7 +95,17 @@ return [
     ],
 
     'flush' => [
-        //
+        // JWT state is request-scoped; forget these between Octane requests so
+        // one request can never reuse another request's token/guard state.
+        'tymon.jwt',
+        'tymon.jwt.manager',
+        'tymon.jwt.parser',
+        'tymon.jwt.blacklist',
+        'tymon.jwt.payload.factory',
+        'tymon.jwt.provider.auth',
+        'tymon.jwt.provider.jwt',
+        'tymon.jwt.provider.storage',
+        'tymon.jwt.validators.payload',
     ],
 
 

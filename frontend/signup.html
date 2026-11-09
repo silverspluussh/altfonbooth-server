@@ -113,6 +113,7 @@
 </section>
 
 <script src="js/jquery.js"></script>
+<script src="js/session.js"></script>
 <script src="js/altfon.js"></script>
 <script>
     function togglePassword(id, icon) {
@@ -145,7 +146,12 @@
         };
 
         try {
-            await apiRequest('/signup', { method: 'POST', body: JSON.stringify(userData) });
+            await apiRequest('/signup', {
+                method: 'POST',
+                auth: false,
+                retryOnUnauthorized: false,
+                body: JSON.stringify(userData)
+            });
             UI.showToast('OTP sent successfully!');
             document.getElementById('signupStep').classList.remove('active');
             document.getElementById('verifyStep').classList.add('active');
@@ -165,6 +171,8 @@
         try {
             await apiRequest('/verify', {
                 method: 'POST',
+                auth: false,
+                retryOnUnauthorized: false,
                 body: JSON.stringify({ phonenumber: userData.phonenumber, otp: document.getElementById('otp').value })
             });
             UI.showToast('Account verified! Please login.');
