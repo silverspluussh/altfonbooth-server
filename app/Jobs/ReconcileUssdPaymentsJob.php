@@ -1,0 +1,43 @@
+<?php
+
+namespace App\Jobs;
+
+use App\Models\UssdPaymentIntent;
+use App\Services\UssdPaymentService;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+
+class ReconcileUssdPaymentsJob implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public int $tries = 1;
+
+    public int $timeout = 120;
+
+    public function handle(UssdPaymentService $payments): void
+    {
+        UssdPaymentIntent::whereIn('status', [
+            UssdPaymentIntent::STATUS_PENDING,
+            UssdPaymentIntent::STATUS_PROCESSING,
+        ])
+            ->where('created_at', '<=', now()->subMinutes(2))
+            ->chunkById(100, function ($intents) use ($payments) {
+                foreach ($intents as $intent) {
+                    $payments->refresh($intent);
+                }
+            });
+
+        UssdPaymentIntent::where('status', UssdPaymentIntent::STATUS_PENDING_TOPUP)
+            ->where('topup_attempts', '<', UssdPaymentService::MAX_TOPUP_ATTEMPTS)
+            ->where('updated_at', '<=', now()->subMinute())
+            ->chunkById(100, function ($intents) use ($payments) {
+                foreach ($intents as $intent) {
+                    $payments->retryTopup($intent);
+                }
+            });
+    }
+}

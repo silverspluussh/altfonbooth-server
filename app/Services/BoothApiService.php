@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -46,6 +47,49 @@ class BoothApiService
     public function getBalance(string $accesscode): ?Response
     {
         return $this->call('booth_getbal.php', ['accesscode' => $accesscode]);
+    }
+
+    public function getBalances(array $accesscodes): array
+    {
+        $accesscodes = array_values(array_unique(array_map('strval', $accesscodes)));
+
+        if ($accesscodes === []) {
+            return [];
+        }
+
+        $baseUrl = $this->baseUrl();
+
+        try {
+            $responses = Http::pool(function (Pool $pool) use ($accesscodes, $baseUrl) {
+                foreach ($accesscodes as $accesscode) {
+                    $pool->as($accesscode)
+                        ->asForm()
+                        ->timeout(3)
+                        ->connectTimeout(2)
+                        ->post("{$baseUrl}/booth_getbal.php", ['accesscode' => $accesscode]);
+                }
+            });
+        } catch (\Throwable $e) {
+            Log::warning('Booth balance pool failed', ['error' => $e->getMessage()]);
+
+            return array_fill_keys($accesscodes, null);
+        }
+
+        $balances = [];
+
+        foreach ($accesscodes as $accesscode) {
+            $response = $responses[$accesscode] ?? null;
+
+            if (!$response instanceof Response || !$response->successful()) {
+                $balances[$accesscode] = null;
+                continue;
+            }
+
+            $balance = $this->extractBalance($response);
+            $balances[$accesscode] = is_numeric($balance) ? (float) $balance : null;
+        }
+
+        return $balances;
     }
 
     public function topup(string $accesscode, string|int|float $amount): ?Response
