@@ -64,6 +64,7 @@ class AuthController
             'emailaddress' => $user['emailaddress'] ?? null,
             'phonenumber' => $user['phonenumber'] ?? null,
             'country' => $user['country'] ?? null,
+            'domain' => $user['domain'] ?? null,
             'authusername' => $user['authusername'] ?? null,
             'authpassword' => $user['authpassword'] ?? null,
         ];

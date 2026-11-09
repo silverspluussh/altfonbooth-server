@@ -6,9 +6,9 @@ use App\Http\Resources\SubscriberResource;
 use App\Models\SubscriberAuthModel;
 use App\Models\SubscribersModel;
 use App\Models\SubscribersTempModel;
-use App\Models\VoiceRelay;
 use App\Services\BoothApiService;
 use App\Support\Msisdn;
+use App\Support\SubscriberDomain;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -45,6 +45,7 @@ class AuthController extends Controller
         $emailaddress = $request->input('emailaddress') ?? $request->input('email');
         $phonenumber = Msisdn::toStorage($request->input('phonenumber'));
         $phoneCandidates = Msisdn::storageCandidates($request->input('phonenumber'));
+        $country = trim((string) $request->input('country'));
 
         if ($phonenumber === null) {
             return response()->json([
@@ -75,7 +76,7 @@ class AuthController extends Controller
             'password' => Hash::make($request->password),
             'phonenumber' => $phonenumber,
             'emailaddress' => $emailaddress,
-            'country' => $request->country,
+            'country' => $country !== '' ? $country : 'Ghana',
             'otp' => $otp,
             'otp_expiration' => Carbon::now()->addMinutes(self::OTP_DEFAULT_TTL_MINUTES),
             'status' => 'pending',
@@ -150,6 +151,9 @@ class AuthController extends Controller
             return response()->json(['status' => false, 'message' => 'Subscriber already registered'], 409);
         }
 
+        $domain = SubscriberDomain::fromCountry($temp->country);
+        SubscriberDomain::ensureRelay($domain);
+
         $subscriberId = 'SUB_' . strtoupper(Str::random(10));
         $subscriber = SubscribersModel::create([
             'subscriberid' => $subscriberId,
@@ -159,6 +163,7 @@ class AuthController extends Controller
             'phonenumber' => Msisdn::toStorage($temp->phonenumber) ?? $temp->phonenumber,
             'emailaddress' => $temp->emailaddress,
             'country' => $temp->country,
+            'domain' => $domain,
             'authusername' => null,
             'switch_status' => 'active',
             'billing_acc_status' => 'active',
@@ -440,30 +445,16 @@ class AuthController extends Controller
 
     private function provisionSubscriber(SubscribersModel $subscriber, SubscriberAuthModel $auth, string $code): void
     {
-        $relay = $this->resolveRelayForCountry($subscriber->country);
-
         $payload = [
             'email' => $subscriber->emailaddress,
             'name' => $subscriber->fullname,
             'phone' => Msisdn::toInternational($subscriber->phonenumber) ?? $subscriber->phonenumber,
             'authusername' => $auth->authusername,
             'authpassword' => $auth->authpassword,
-            'domain' => $relay->domain ?? '',
+            'domain' => $subscriber->domain ?: SubscriberDomain::fromCountry($subscriber->country),
             'code' => $code,
         ];
 
         app(BoothApiService::class)->provision(config('services.booth.provision_url'), $payload);
-    }
-
-    private function resolveRelayForCountry(?string $country): ?VoiceRelay
-    {
-        if ($country) {
-            $relay = VoiceRelay::where('domain', 'like', "%{$country}%")->first();
-            if ($relay) {
-                return $relay;
-            }
-        }
-
-        return VoiceRelay::first();
     }
 }

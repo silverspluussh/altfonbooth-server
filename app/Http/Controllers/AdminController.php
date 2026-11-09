@@ -14,6 +14,7 @@ use App\Models\PrepaidCredit;
 use App\Services\BoothApiService;
 use App\Services\PrepaidCreditService;
 use App\Support\Msisdn;
+use App\Support\SubscriberDomain;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -161,10 +162,18 @@ class AdminController extends Controller
             'emailaddress' => 'required|email|unique:subscribers,emailaddress',
             'phonenumber' => 'nullable|string|max:20',
             'country' => 'nullable|string|max:100',
+            'domain' => ['nullable', 'string', 'max:100', 'regex:/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i'],
             'password' => 'required|string|min:6',
         ]);
 
         $subscriberid = 'SUB' . strtoupper(Str::random(8));
+        $country = trim((string) $request->input('country'));
+        $country = $country !== '' ? $country : 'Ghana';
+        $domain = $request->filled('domain')
+            ? strtolower(trim((string) $request->domain))
+            : SubscriberDomain::fromCountry($country);
+
+        SubscriberDomain::ensureRelay($domain);
 
         $sub = SubscribersModel::create([
             'subscriberid' => $subscriberid,
@@ -172,7 +181,8 @@ class AdminController extends Controller
             'username' => $request->username,
             'emailaddress' => $request->emailaddress,
             'phonenumber' => Msisdn::toStorage($request->phonenumber),
-            'country' => $request->country,
+            'country' => $country,
+            'domain' => $domain,
             'password' => Hash::make($request->password),
         ]);
 
@@ -196,6 +206,7 @@ class AdminController extends Controller
             'emailaddress' => 'sometimes|email|unique:subscribers,emailaddress,' . $sub->recid . ',recid',
             'phonenumber' => 'nullable|string|max:20',
             'country' => 'nullable|string|max:100',
+            'domain' => ['nullable', 'string', 'max:100', 'regex:/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i'],
             'password' => 'nullable|string|min:6',
             'switch_status' => 'nullable|string',
             'billing_acc_status' => 'nullable|string',
@@ -204,6 +215,31 @@ class AdminController extends Controller
         $data = $request->only(['fullname', 'username', 'emailaddress', 'phonenumber', 'country', 'switch_status', 'billing_acc_status']);
         if ($request->has('phonenumber')) {
             $data['phonenumber'] = Msisdn::toStorage($request->input('phonenumber'));
+        }
+        $country = $request->has('country')
+            ? trim((string) $request->input('country'))
+            : null;
+
+        if ($country !== null) {
+            $country = $country !== '' ? $country : 'Ghana';
+            $data['country'] = $country;
+        }
+
+        $countryChanged = $country !== null && $country !== trim((string) $sub->country);
+        $domainInput = $request->filled('domain')
+            ? strtolower(trim((string) $request->domain))
+            : null;
+        $domainChanged = $domainInput !== null
+            && $domainInput !== strtolower(trim((string) $sub->domain));
+
+        if ($domainChanged) {
+            $data['domain'] = $domainInput;
+        } elseif ($countryChanged) {
+            $data['domain'] = SubscriberDomain::fromCountry($country);
+        }
+
+        if (isset($data['domain'])) {
+            SubscriberDomain::ensureRelay($data['domain']);
         }
         if ($request->filled('password')) {
             $data['password'] = Hash::make($request->password);

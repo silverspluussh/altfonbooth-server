@@ -362,6 +362,7 @@ function renderSubscribersTable(list) {
         { label: 'Username', key: 'username' },
         { label: 'Phone', key: 'phonenumber' },
         { label: 'Country', key: 'country' },
+        { label: 'Domain', key: 'domain' },
     ], [
         { label: 'Edit', style: 'primary', handler: (row) => showSubscriberModal(row) },
         { label: 'Delete', style: 'danger', handler: (row) => confirmDeleteSubscriber(row) },
@@ -383,6 +384,8 @@ function showSubscriberModal(sub = null) {
             <input name="phonenumber" value="${UI.esc(sub?.phonenumber || '')}">
             <label>Country</label>
             <input name="country" value="${UI.esc(sub?.country || '')}">
+            <label>Domain</label>
+            <input name="domain" value="${UI.esc(sub?.domain || '')}" placeholder="Blank = derive from country">
             ${isEdit ? '' : '<label>Password *</label><input name="password" type="password" required>'}
         </form>
     `;

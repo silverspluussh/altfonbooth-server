@@ -15,6 +15,7 @@ class SubscribersModel extends Authenticatable implements JWTSubject
         'phonenumber',
         'emailaddress',
         'country',
+        'domain',
         'authusername',
         'switch_status',
         'billing_acc_status',

@@ -26,6 +26,7 @@ class SubscriberController
                 'emailaddress' => $subscriber->emailaddress,
                 'phonenumber' => $subscriber->phonenumber,
                 'country' => $subscriber->country,
+                'domain' => $subscriber->domain,
                 'authusername' => $subscriber->authusername,
                 'authpassword' => $subscriber->auth?->authpassword,
             ],

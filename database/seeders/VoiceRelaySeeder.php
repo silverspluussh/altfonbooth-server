@@ -17,8 +17,14 @@ class VoiceRelaySeeder extends Seeder
             'updated_at' => now(),
         ];
 
-        if (DB::table('voice_relay')->exists()) {
-            DB::table('voice_relay')->update($relay);
+        $existing = DB::table('voice_relay')
+            ->where('domain', 'ghana.altfon.net')
+            ->first();
+
+        if ($existing) {
+            DB::table('voice_relay')
+                ->where('recid', $existing->recid)
+                ->update($relay);
 
             return;
         }
