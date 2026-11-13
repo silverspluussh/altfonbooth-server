@@ -21,7 +21,7 @@ return [
         'public_key' => env('PAYSTACK_PUBLIC_KEY', ''),
         'base_url' => rtrim(env('PAYSTACK_BASE_URL', 'https://api.paystack.co'), '/'),
         'currency' => strtoupper(env('PAYSTACK_CURRENCY', 'GHS')),
-        'timeout' => (int) env('PAYSTACK_TIMEOUT', 15),
+        'timeout' => (int) env('PAYSTACK_TIMEOUT', 3),
         'fallback_email' => env('PAYSTACK_FALLBACK_EMAIL', ''),
         'mobile_callback_url' => env('PAYSTACK_MOBILE_CALLBACK_URL')
             ?: rtrim(env('APP_URL') ?: 'http://localhost', '/') . '/payment-complete',

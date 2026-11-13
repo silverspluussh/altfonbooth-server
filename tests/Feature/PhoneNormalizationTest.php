@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SendOtpSmsJob;
 use App\Models\SubscribersModel;
 use App\Models\SubscribersTempModel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class PhoneNormalizationTest extends TestCase
@@ -47,6 +50,70 @@ class PhoneNormalizationTest extends TestCase
 
         $this->assertDatabaseHas('subscribers_temp', ['phonenumber' => '0249335549']);
         $this->assertDatabaseMissing('subscribers_temp', ['phonenumber' => '+233249335549']);
+    }
+
+    public function test_signup_recovers_numbers_with_a_misplaced_trunk_zero(): void
+    {
+        $this->signup('+2330249335549', 'trunkzero');
+
+        $this->assertDatabaseHas('subscribers_temp', ['phonenumber' => '0249335549']);
+        $this->assertDatabaseMissing('subscribers_temp', ['phonenumber' => '2330249335549']);
+    }
+
+    public function test_signup_dispatches_the_otp_to_the_normalized_number(): void
+    {
+        Queue::fake();
+        Mail::fake();
+
+        $this->postJson('/api/signup', [
+            'username' => 'trunkjob',
+            'password' => 'Password123',
+            'confirm_password' => 'Password123',
+            'phonenumber' => '+2330249335549',
+            'fullname' => 'Trunk Job',
+            'emailaddress' => 'trunkjob@example.com',
+            'country' => 'Ghana',
+        ])->assertStatus(201);
+
+        Queue::assertPushed(
+            SendOtpSmsJob::class,
+            fn (SendOtpSmsJob $job) => $job->phone === '0249335549'
+        );
+    }
+
+    public function test_verify_matches_a_number_with_a_misplaced_trunk_zero(): void
+    {
+        $payload = $this->signup('+2330249335549', 'trunkverify');
+
+        $this->postJson('/api/verify', [
+            'phonenumber' => '+2330249335549',
+            'otp' => $payload['debug_otp'],
+        ])->assertOk()->assertJsonPath('status', true);
+
+        $this->assertDatabaseHas('subscribers', ['phonenumber' => '0249335549']);
+    }
+
+    public function test_verify_matches_a_legacy_row_stored_as_digits(): void
+    {
+        SubscribersTempModel::create([
+            'subscriberid' => 'TEMP_TRUNK',
+            'fullname' => 'Trunk Legacy',
+            'username' => 'trunklegacy',
+            'password' => bcrypt('Password123'),
+            'phonenumber' => '2330249335549',
+            'emailaddress' => 'trunklegacy@example.com',
+            'country' => 'Ghana',
+            'otp' => '654321',
+            'otp_expiration' => now()->addMinutes(10),
+            'status' => 'pending',
+        ]);
+
+        $this->postJson('/api/verify', [
+            'phonenumber' => '+2330249335549',
+            'otp' => '654321',
+        ])->assertOk();
+
+        $this->assertDatabaseHas('subscribers', ['phonenumber' => '0249335549']);
     }
 
     public function test_signup_stores_digits_for_non_ghana_numbers(): void

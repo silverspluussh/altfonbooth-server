@@ -147,7 +147,8 @@ class UssdController extends Controller
             return $this->error('FORBIDDEN', 'This SIP number does not belong to you.', 403);
         }
 
-        $response = $this->booth->getBalance($account->authusername);
+        // Keep this short so the USSD balance screen answers inside the gateway budget.
+        $response = $this->booth->getBalance($account->authusername, 3);
         $balance = $this->booth->extractBalance($response);
 
         if ($response === null || $balance === null || !is_numeric($balance)) {

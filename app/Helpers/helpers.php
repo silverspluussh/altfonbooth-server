@@ -7,11 +7,16 @@ if (!function_exists('send_sms_mnotify')) {
         $apiKey = config('services.mnotify.key');
         $sender = config('services.mnotify.sender');
 
-        // Format phone number (e.g., 024XXXXXXX to 23324XXXXXXX)
-        $to = preg_replace('/[^0-9]/', '', $to);
-        if (str_starts_with($to, '0') && strlen($to) == 10) {
-            $to = '233' . substr($to, 1);
+        // Canonicalize Ghanaian numbers to 233XXXXXXXXX so a malformed or
+        // legacy stored value (e.g. 2330XXXXXXXXX) still reaches the gateway
+        // in a format it accepts.
+        $recipient = \App\Support\Msisdn::toInternational((string) $to);
+
+        if ($recipient === null) {
+            $recipient = preg_replace('/[^0-9]/', '', (string) $to) ?? '';
         }
+
+        $to = $recipient;
 
         try {
             $response = \Illuminate\Support\Facades\Http::acceptJson()

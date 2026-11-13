@@ -29,6 +29,25 @@ class HelperTest extends TestCase
     }
 
     /**
+     * The gateway must receive a canonical Ghanaian number even when the
+     * stored value contains a misplaced trunk zero.
+     */
+    public function test_send_sms_mnotify_normalizes_a_misplaced_trunk_zero(): void
+    {
+        Http::fake([
+            'api.mnotify.com/*' => Http::response(['status' => 'success'], 200),
+        ]);
+
+        $result = send_sms_mnotify('2330249335549', 'Test Message');
+
+        Http::assertSent(function ($request) {
+            return $request['recipient'] == ['233249335549'];
+        });
+
+        $this->assertNotFalse($result);
+    }
+
+    /**
      * Test Email helper.
      */
     public function test_send_email_otp_helper(): void

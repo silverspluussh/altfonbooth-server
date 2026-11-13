@@ -14,14 +14,14 @@ class BoothApiService
         return rtrim((string) config('services.booth.base_url', 'http://63.250.47.51/altfonapp'), '/');
     }
 
-    public function call(string $endpoint, array $params): ?Response
+    public function call(string $endpoint, array $params, int $timeout = 10): ?Response
     {
         $baseUrl = $this->baseUrl();
 
         try {
             $response = Http::asForm()
-                ->timeout(10)
-                ->connectTimeout(5)
+                ->timeout($timeout)
+                ->connectTimeout(min($timeout, 5))
                 ->post("{$baseUrl}/{$endpoint}", $params);
 
             if (!$response->successful()) {
@@ -44,9 +44,9 @@ class BoothApiService
         }
     }
 
-    public function getBalance(string $accesscode): ?Response
+    public function getBalance(string $accesscode, int $timeout = 10): ?Response
     {
-        return $this->call('booth_getbal.php', ['accesscode' => $accesscode]);
+        return $this->call('booth_getbal.php', ['accesscode' => $accesscode], $timeout);
     }
 
     public function getBalances(array $accesscodes): array

@@ -371,7 +371,8 @@ class UssdPaymentService
 
     public function balanceFor(string $authusername): ?float
     {
-        $response = $this->booth->getBalance($authusername);
+        // Keep this short: it runs inside the synchronous USSD response budget.
+        $response = $this->booth->getBalance($authusername, 2);
         $balance = $this->booth->extractBalance($response);
 
         return is_numeric($balance) ? (float) $balance : null;

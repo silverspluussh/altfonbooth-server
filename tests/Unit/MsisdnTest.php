@@ -20,9 +20,19 @@ class MsisdnTest extends TestCase
         $this->assertSame('0249335549', Msisdn::normalize('00233249335549'));
     }
 
+    public function test_it_recovers_numbers_with_a_misplaced_trunk_zero(): void
+    {
+        $this->assertSame('0249335549', Msisdn::normalize('+2330249335549'));
+        $this->assertSame('0249335549', Msisdn::normalize('2330249335549'));
+        $this->assertSame('0249335549', Msisdn::normalize('+233 024 933 5549'));
+        $this->assertSame('0249335549', Msisdn::normalize('002330249335549'));
+        $this->assertSame('0249335549', Msisdn::normalize('0233249335549'));
+    }
+
     public function test_it_converts_to_international_format(): void
     {
         $this->assertSame('233249335549', Msisdn::toInternational('0249335549'));
+        $this->assertSame('233249335549', Msisdn::toInternational('2330249335549'));
     }
 
     public function test_it_rejects_invalid_numbers(): void
@@ -39,6 +49,7 @@ class MsisdnTest extends TestCase
         $this->assertSame('0249335549', Msisdn::toStorage('233 24 933 5549'));
         $this->assertSame('0249335549', Msisdn::toStorage('00233249335549'));
         $this->assertSame('0249335549', Msisdn::toStorage('249335549'));
+        $this->assertSame('0249335549', Msisdn::toStorage('+2330249335549'));
     }
 
     public function test_it_reduces_other_numbers_to_digits(): void
@@ -57,10 +68,16 @@ class MsisdnTest extends TestCase
     public function test_storage_candidates_include_raw_and_normalized_values(): void
     {
         $this->assertSame(
-            ['+233249335549', '0249335549'],
+            ['+233249335549', '0249335549', '233249335549'],
             Msisdn::storageCandidates('+233249335549')
         );
 
         $this->assertSame(['0249335549'], Msisdn::storageCandidates('0249335549'));
+
+        // A legacy row stored as 2330XXXXXXXXX must still resolve.
+        $this->assertSame(
+            ['+2330249335549', '0249335549', '2330249335549'],
+            Msisdn::storageCandidates('+2330249335549')
+        );
     }
 }

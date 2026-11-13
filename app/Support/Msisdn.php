@@ -12,6 +12,18 @@ final class Msisdn
             $digits = substr($digits, 2);
         }
 
+        // The mobile intl phone field prepends the dial code to whatever the
+        // user types. When the user keeps the local trunk '0', we end up with
+        // a Ghanaian number like 2330XXXXXXXXX; recover the canonical form.
+        if (str_starts_with($digits, '2330') && strlen($digits) === 13) {
+            $digits = '233' . substr($digits, 4);
+        }
+
+        // The same trunk '0' on the other side of the dial code (0233…).
+        if (str_starts_with($digits, '0233') && strlen($digits) === 13) {
+            $digits = substr($digits, 1);
+        }
+
         if (strlen($digits) === 12 && str_starts_with($digits, '233')) {
             $local = '0' . substr($digits, 3);
         } elseif (strlen($digits) === 10 && str_starts_with($digits, '0')) {
@@ -76,6 +88,14 @@ final class Msisdn
 
         if ($storage !== null) {
             $candidates[] = $storage;
+        }
+
+        // Include the raw digits so pending rows written before normalization
+        // (e.g. 2330XXXXXXXXX) still resolve during a lookup.
+        $digits = preg_replace('/\D+/', '', $trimmed) ?? '';
+
+        if ($digits !== '') {
+            $candidates[] = $digits;
         }
 
         return array_values(array_unique($candidates));
