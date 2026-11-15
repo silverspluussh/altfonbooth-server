@@ -15,6 +15,9 @@ class SubscribersModel extends Authenticatable implements JWTSubject
         'phonenumber',
         'emailaddress',
         'country',
+        'country_id',
+        'has_mobile_account',
+        'has_booth_account',
         'domain',
         'authusername',
         'switch_status',
@@ -27,6 +30,12 @@ class SubscribersModel extends Authenticatable implements JWTSubject
         'password',
         'password_reset_token',
         'password_reset_expiration',
+    ];
+
+    protected $casts = [
+        'country_id' => 'integer',
+        'has_mobile_account' => 'boolean',
+        'has_booth_account' => 'boolean',
     ];
 
     public $timestamps = true;
@@ -58,5 +67,47 @@ class SubscribersModel extends Authenticatable implements JWTSubject
     public function auth()
     {
         return $this->hasOne(SubscriberAuthModel::class, 'subscriberid', 'subscriberid');
+    }
+
+    public function auths()
+    {
+        return $this->hasMany(SubscriberAuthModel::class, 'subscriberid', 'subscriberid');
+    }
+
+    public function channels()
+    {
+        return $this->hasMany(SubscriberChannelModel::class, 'subscriberid', 'subscriberid');
+    }
+
+    public function mobileChannel()
+    {
+        return $this->hasOne(SubscriberChannelModel::class, 'subscriberid', 'subscriberid')
+            ->where('channel', SubscriberChannelModel::MOBILE);
+    }
+
+    public function boothChannel()
+    {
+        return $this->hasOne(SubscriberChannelModel::class, 'subscriberid', 'subscriberid')
+            ->where('channel', SubscriberChannelModel::BOOTH);
+    }
+
+    public function channelProfile(string $channel): ?SubscriberChannelModel
+    {
+        return $this->channels()->where('channel', $channel)->first();
+    }
+
+    public function hasChannel(string $channel): bool
+    {
+        if (!$this->channels()->exists()) {
+            // Legacy/malformed rows without channel profiles keep working until
+            // the database is rebuilt with explicit channels.
+            return true;
+        }
+
+        return match ($channel) {
+            SubscriberChannelModel::MOBILE => (bool) $this->has_mobile_account,
+            SubscriberChannelModel::BOOTH => (bool) $this->has_booth_account,
+            default => false,
+        };
     }
 }

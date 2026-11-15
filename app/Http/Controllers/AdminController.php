@@ -7,12 +7,15 @@ use App\Http\Resources\SubscriberResource;
 use App\Http\Resources\SubscriberAuthResource;
 use App\Http\Resources\SubscriberDestResource;
 use App\Models\AdminModel;
+use App\Models\Country;
 use App\Models\SubscribersModel;
 use App\Models\SubscriberAuthModel;
+use App\Models\SubscriberChannelModel;
 use App\Models\SubscriberDestModel;
 use App\Models\PrepaidCredit;
 use App\Services\BoothApiService;
 use App\Services\PrepaidCreditService;
+use App\Services\SubscriberChannelService;
 use App\Support\Msisdn;
 use App\Support\SubscriberDomain;
 use Illuminate\Http\JsonResponse;
@@ -161,35 +164,55 @@ class AdminController extends Controller
             'username' => 'required|string|max:255|unique:subscribers,username',
             'emailaddress' => 'required|email|unique:subscribers,emailaddress',
             'phonenumber' => 'nullable|string|max:20',
-            'country' => 'nullable|string|max:100',
-            'domain' => ['nullable', 'string', 'max:100', 'regex:/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i'],
+            'country_id' => 'nullable|integer',
+            'has_mobile_account' => 'sometimes|boolean',
+            'has_booth_account' => 'sometimes|boolean',
             'password' => 'required|string|min:6',
         ]);
 
-        $subscriberid = 'SUB' . strtoupper(Str::random(8));
-        $country = trim((string) $request->input('country'));
-        $country = $country !== '' ? $country : 'Ghana';
-        $domain = $request->filled('domain')
-            ? strtolower(trim((string) $request->domain))
-            : SubscriberDomain::fromCountry($country);
+        $service = app(SubscriberChannelService::class);
+        $wantsMobile = $request->boolean('has_mobile_account');
+        $wantsBooth = $request->boolean('has_booth_account');
 
-        SubscriberDomain::ensureRelay($domain);
+        if (!$wantsMobile && !$wantsBooth) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Select at least one account type (mobile or booth).',
+            ], 422);
+        }
+
+        $country = $wantsMobile ? $service->resolveCountry($request->all()) : null;
+        if ($wantsMobile && !$country) {
+            return response()->json([
+                'status' => false,
+                'message' => 'A valid country is required for a mobile account.',
+            ], 422);
+        }
 
         $sub = SubscribersModel::create([
-            'subscriberid' => $subscriberid,
+            'subscriberid' => 'SUB' . strtoupper(Str::random(8)),
             'fullname' => $request->fullname,
             'username' => $request->username,
             'emailaddress' => $request->emailaddress,
             'phonenumber' => Msisdn::toStorage($request->phonenumber),
-            'country' => $country,
-            'domain' => $domain,
             'password' => Hash::make($request->password),
+            'has_mobile_account' => false,
+            'has_booth_account' => false,
+            'switch_status' => 'active',
+            'billing_acc_status' => 'active',
         ]);
+
+        if ($wantsMobile) {
+            $service->createChannel($sub, SubscriberChannelModel::MOBILE, $country);
+        }
+        if ($wantsBooth) {
+            $service->createChannel($sub, SubscriberChannelModel::BOOTH);
+        }
 
         return response()->json([
             'status' => true,
             'message' => 'Subscriber created successfully',
-            'data' => new SubscriberResource($sub)
+            'data' => new SubscriberResource($sub->fresh())
         ], 201);
     }
 
@@ -205,47 +228,80 @@ class AdminController extends Controller
             'username' => 'sometimes|string|max:255|unique:subscribers,username,' . $sub->recid . ',recid',
             'emailaddress' => 'sometimes|email|unique:subscribers,emailaddress,' . $sub->recid . ',recid',
             'phonenumber' => 'nullable|string|max:20',
-            'country' => 'nullable|string|max:100',
-            'domain' => ['nullable', 'string', 'max:100', 'regex:/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i'],
+            'country_id' => 'nullable|integer',
+            'has_mobile_account' => 'sometimes|boolean',
+            'has_booth_account' => 'sometimes|boolean',
             'password' => 'nullable|string|min:6',
             'switch_status' => 'nullable|string',
             'billing_acc_status' => 'nullable|string',
         ]);
 
-        $data = $request->only(['fullname', 'username', 'emailaddress', 'phonenumber', 'country', 'switch_status', 'billing_acc_status']);
+        $service = app(SubscriberChannelService::class);
+        $targetMobile = $request->has('has_mobile_account')
+            ? $request->boolean('has_mobile_account')
+            : (bool) $sub->has_mobile_account;
+        $targetBooth = $request->has('has_booth_account')
+            ? $request->boolean('has_booth_account')
+            : (bool) $sub->has_booth_account;
+
+        if (!$targetMobile && !$targetBooth) {
+            return response()->json([
+                'status' => false,
+                'message' => 'A subscriber must have at least one account type.',
+            ], 422);
+        }
+
+        $data = $request->only(['fullname', 'username', 'emailaddress', 'switch_status', 'billing_acc_status']);
         if ($request->has('phonenumber')) {
             $data['phonenumber'] = Msisdn::toStorage($request->input('phonenumber'));
-        }
-        $country = $request->has('country')
-            ? trim((string) $request->input('country'))
-            : null;
-
-        if ($country !== null) {
-            $country = $country !== '' ? $country : 'Ghana';
-            $data['country'] = $country;
-        }
-
-        $countryChanged = $country !== null && $country !== trim((string) $sub->country);
-        $domainInput = $request->filled('domain')
-            ? strtolower(trim((string) $request->domain))
-            : null;
-        $domainChanged = $domainInput !== null
-            && $domainInput !== strtolower(trim((string) $sub->domain));
-
-        if ($domainChanged) {
-            $data['domain'] = $domainInput;
-        } elseif ($countryChanged) {
-            $data['domain'] = SubscriberDomain::fromCountry($country);
-        }
-
-        if (isset($data['domain'])) {
-            SubscriberDomain::ensureRelay($data['domain']);
         }
         if ($request->filled('password')) {
             $data['password'] = Hash::make($request->password);
         }
-
         $sub->update($data);
+
+        $mobileProfile = $sub->channelProfile(SubscriberChannelModel::MOBILE);
+        $boothProfile = $sub->channelProfile(SubscriberChannelModel::BOOTH);
+
+        if ($targetMobile) {
+            $country = $service->resolveCountry([
+                'country_id' => $request->input('country_id', $sub->country_id),
+                'country' => $sub->country,
+            ]);
+
+            if (!$country) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'A valid country is required for a mobile account.',
+                ], 422);
+            }
+
+            if ($mobileProfile) {
+                $countryChanged = (int) $mobileProfile->country_id !== (int) $country->id;
+                if ($countryChanged) {
+                    $domain = $service->domainFor(SubscriberChannelModel::MOBILE, $country);
+                    SubscriberDomain::ensureRelay($domain);
+                    $mobileProfile->update([
+                        'country_id' => $country->id,
+                        'domain' => $domain,
+                    ]);
+                    $service->syncDefaults($sub->fresh());
+                    $service->provision($sub->fresh(), $mobileProfile->fresh());
+                }
+            } else {
+                $service->createChannel($sub, SubscriberChannelModel::MOBILE, $country);
+            }
+        } elseif ($mobileProfile) {
+            $service->removeChannel($sub, SubscriberChannelModel::MOBILE);
+        }
+
+        if ($targetBooth && !$boothProfile) {
+            $service->createChannel($sub, SubscriberChannelModel::BOOTH);
+        } elseif (!$targetBooth && $boothProfile) {
+            $service->removeChannel($sub, SubscriberChannelModel::BOOTH);
+        }
+
+        $service->syncDefaults($sub->fresh());
 
         return response()->json([
             'status' => true,
@@ -266,6 +322,7 @@ class AdminController extends Controller
         SubscriberDestModel::whereIn('authusername', $authUsernames)->delete();
         PrepaidCredit::whereIn('authusername', $authUsernames)->delete();
         SubscriberAuthModel::where('subscriberid', $sub->subscriberid)->delete();
+        SubscriberChannelModel::where('subscriberid', $sub->subscriberid)->delete();
         $sub->delete();
 
         return response()->json(['status' => true, 'message' => 'Subscriber and all related data deleted']);
@@ -275,12 +332,19 @@ class AdminController extends Controller
     {
         $auths = SubscriberAuthModel::all();
 
-        $result = $auths->map(function ($auth) {
+        $profiles = SubscriberChannelModel::query()
+            ->get()
+            ->keyBy(fn ($profile) => $profile->subscriberid . ':' . $profile->channel);
+
+        $result = $auths->map(function ($auth) use ($profiles) {
             $response = $this->booth()->getBalance($auth->authusername);
+            $profile = $profiles->get($auth->subscriberid . ':' . ($auth->channel ?: 'mobile'));
 
             return [
                 'id' => $auth->id,
                 'subscriberid' => $auth->subscriberid,
+                'channel' => $auth->channel ?: 'mobile',
+                'domain' => $profile?->domain,
                 'authusername' => $auth->authusername,
                 'balance' => $this->booth()->extractBalance($response) ?? 0.00,
                 'status' => $auth->status,
@@ -300,10 +364,15 @@ class AdminController extends Controller
         }
 
         $response = $this->booth()->getBalance($auth->authusername);
+        $profile = SubscriberChannelModel::where('subscriberid', $auth->subscriberid)
+            ->where('channel', $auth->channel ?: 'mobile')
+            ->first();
 
         return response()->json(['data' => [
             'id' => $auth->id,
             'subscriberid' => $auth->subscriberid,
+            'channel' => $auth->channel ?: 'mobile',
+            'domain' => $profile?->domain,
             'authusername' => $auth->authusername,
             'balance' => $this->booth()->extractBalance($response) ?? 0.00,
             'status' => $auth->status,
@@ -316,18 +385,25 @@ class AdminController extends Controller
     {
         $request->validate([
             'subscriberid' => 'required|exists:subscribers,subscriberid',
+            'channel' => 'required|in:mobile,booth',
             'authusername' => 'required|regex:/^\d+$/|unique:subscriber_auth,authusername',
             'authpassword' => 'nullable|string',
             'status' => 'nullable|string|in:active,inactive,suspended',
         ]);
 
-        $subscriberExists = SubscribersModel::where('subscriberid', $request->subscriberid)->exists();
-        if (!$subscriberExists) {
+        $subscriber = SubscribersModel::where('subscriberid', $request->subscriberid)->first();
+        if (!$subscriber) {
             return response()->json(['message' => 'Subscriber not found'], 404);
+        }
+
+        $profile = $subscriber->channelProfile($request->channel);
+        if (!$profile) {
+            return response()->json(['message' => 'The subscriber does not have that channel.'], 422);
         }
 
         $auth = SubscriberAuthModel::create([
             'subscriberid' => $request->subscriberid,
+            'channel' => $request->channel,
             'authusername' => $request->authusername,
             'authpassword' => $request->authpassword ?? Str::random(8),
             'status' => $request->status ?? 'active',
@@ -348,12 +424,13 @@ class AdminController extends Controller
         }
 
         $request->validate([
+            'channel' => 'sometimes|in:mobile,booth',
             'authusername' => 'sometimes|regex:/^\d+$/|unique:subscriber_auth,authusername,' . $id,
             'authpassword' => 'nullable|string',
             'status' => 'nullable|string|in:active,inactive,suspended',
         ]);
 
-        $data = $request->only(['authpassword', 'status']);
+        $data = $request->only(['channel', 'authpassword', 'status']);
         if ($request->has('authusername')) {
             $data['authusername'] = $request->authusername;
         }
@@ -509,6 +586,124 @@ class AdminController extends Controller
             'balance' => $this->booth()->extractBalance($externalBalance) ?? 'N/A',
             'transaction_id' => $transactionId,
         ], 201);
+    }
+
+    public function listCountries(): JsonResponse
+    {
+        $countries = Country::ordered()->get();
+
+        return response()->json(['data' => $countries]);
+    }
+
+    public function storeCountry(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:100|unique:countries,name',
+            'iso_code' => 'nullable|string|max:3|unique:countries,iso_code',
+            'dial_code' => 'nullable|string|max:8',
+            'domain' => ['required', 'string', 'max:100', 'unique:countries,domain', 'regex:/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i'],
+            'is_active' => 'sometimes|boolean',
+            'sort_order' => 'sometimes|integer',
+        ]);
+
+        $validated['domain'] = strtolower(trim($validated['domain']));
+        $validated['iso_code'] = $validated['iso_code'] ? strtoupper($validated['iso_code']) : null;
+        $country = Country::create($validated);
+
+        SubscriberDomain::ensureRelay($country->domain);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Country created successfully',
+            'data' => $country,
+        ], 201);
+    }
+
+    public function updateCountry(Request $request, $id): JsonResponse
+    {
+        $country = Country::find($id);
+        if (!$country) {
+            return response()->json(['message' => 'Country not found'], 404);
+        }
+
+        $validated = $request->validate([
+            'name' => 'sometimes|string|max:100|unique:countries,name,' . $country->id,
+            'iso_code' => 'nullable|string|max:3|unique:countries,iso_code,' . $country->id,
+            'dial_code' => 'nullable|string|max:8',
+            'domain' => ['sometimes', 'string', 'max:100', 'unique:countries,domain,' . $country->id, 'regex:/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i'],
+            'is_active' => 'sometimes|boolean',
+            'sort_order' => 'sometimes|integer',
+        ]);
+
+        if (isset($validated['domain'])) {
+            $validated['domain'] = strtolower(trim($validated['domain']));
+        }
+        if (array_key_exists('iso_code', $validated)) {
+            $validated['iso_code'] = $validated['iso_code'] ? strtoupper($validated['iso_code']) : null;
+        }
+
+        $country->update($validated);
+
+        if (isset($validated['domain'])) {
+            SubscriberDomain::ensureRelay($country->domain);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Country updated successfully',
+            'data' => $country->fresh(),
+        ]);
+    }
+
+    public function deleteCountry($id): JsonResponse
+    {
+        $country = Country::find($id);
+        if (!$country) {
+            return response()->json(['message' => 'Country not found'], 404);
+        }
+
+        $inUse = SubscriberChannelModel::where('country_id', $country->id)->exists();
+        if ($inUse) {
+            return response()->json([
+                'status' => false,
+                'message' => 'This country is used by existing mobile accounts. Deactivate it instead.',
+            ], 409);
+        }
+
+        $country->delete();
+
+        return response()->json(['status' => true, 'message' => 'Country deleted']);
+    }
+
+    public function applyCountryDomain($id): JsonResponse
+    {
+        $country = Country::find($id);
+        if (!$country) {
+            return response()->json(['message' => 'Country not found'], 404);
+        }
+
+        $service = app(SubscriberChannelService::class);
+        $profiles = SubscriberChannelModel::where('country_id', $country->id)
+            ->where('channel', SubscriberChannelModel::MOBILE)
+            ->get();
+
+        SubscriberDomain::ensureRelay($country->domain);
+
+        foreach ($profiles as $profile) {
+            $profile->update(['domain' => $country->domain]);
+            $subscriber = $profile->subscriber;
+
+            if ($subscriber) {
+                $service->syncDefaults($subscriber);
+                $service->provision($subscriber->fresh(), $profile->fresh());
+            }
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Country domain applied to mobile accounts',
+            'updated' => $profiles->count(),
+        ]);
     }
 
     public function dashboard(): JsonResponse

@@ -3,10 +3,16 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\SubscribersController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\CountryController;
 use App\Http\Controllers\PaystackWebhookController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+
+Route::middleware('throttle:60,1')->group(function () {
+    Route::get('/countries', [CountryController::class, 'index']);
+    Route::post('/account-channels', [AuthController::class, 'createChannel']);
+});
 
 // Public Auth Routes — Strict rate limit: 5 attempts per minute
 Route::middleware('throttle:5,1')->group(function () {
@@ -111,6 +117,13 @@ Route::prefix('admin')->group(function () {
         // Credits / Purchase History
         Route::get('/purchase-history', [AdminController::class, 'listPurchaseHistory']);
         Route::post('/credits', [AdminController::class, 'addCredits']);
+
+        // Countries
+        Route::get('/countries', [AdminController::class, 'listCountries']);
+        Route::post('/countries', [AdminController::class, 'storeCountry']);
+        Route::put('/countries/{id}', [AdminController::class, 'updateCountry']);
+        Route::delete('/countries/{id}', [AdminController::class, 'deleteCountry']);
+        Route::post('/countries/{id}/apply-domain', [AdminController::class, 'applyCountryDomain']);
 
         // Super Admin only routes
         Route::middleware('admin.role:super_admin')->group(function () {

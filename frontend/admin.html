@@ -346,6 +346,10 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
+        .checkbox-row { display: flex; gap: 1rem; margin-bottom: 1rem; }
+        .checkbox-row label { display: flex; align-items: center; gap: .4rem; font-weight: 500; }
+        .form-hint { font-size: .8rem; color: #64748b; margin: -.5rem 0 1rem; }
+
         @media (max-width: 768px) {
             .mobile-toggle { display: inline-flex; }
             :root { --sidebar-w: 0px; }
@@ -396,6 +400,7 @@
         <nav>
             <a href="#dashboard" data-view="dashboard"><i class="fa fa-dashboard"></i> Dashboard</a>
             <a href="#subscribers" data-view="subscribers"><i class="fa fa-users"></i> Subscribers</a>
+            <a href="#countries" data-view="countries"><i class="fa fa-globe"></i> Countries</a>
             <a href="#auth-users" data-view="auth-users"><i class="fa fa-phone"></i> SIP Accounts</a>
             <a href="#destinations" data-view="destinations"><i class="fa fa-map-marker"></i> Destinations</a>
             <a href="#purchase-history" data-view="purchase-history"><i class="fa fa-credit-card"></i> Credits & History</a>

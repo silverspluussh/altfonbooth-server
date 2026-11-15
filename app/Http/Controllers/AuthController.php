@@ -3,12 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\SubscriberResource;
-use App\Models\SubscriberAuthModel;
+use App\Models\Country;
+use App\Models\SubscriberChannelModel;
 use App\Models\SubscribersModel;
 use App\Models\SubscribersTempModel;
-use App\Services\BoothApiService;
+use App\Services\ChannelSetupTokenService;
+use App\Services\SubscriberChannelService;
 use App\Support\Msisdn;
-use App\Support\SubscriberDomain;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,6 +25,9 @@ class AuthController extends Controller
 
     public function signup(Request $request): JsonResponse
     {
+        $channel = $this->resolveChannel($request);
+        $channels = app(SubscriberChannelService::class);
+
         $validator = Validator::make($request->all(), [
             'username' => 'required|string|max:50',
             'password' => 'required|string|min:8|max:100',
@@ -35,17 +39,28 @@ class AuthController extends Controller
             'emailaddress' => 'nullable|email|max:180',
             'email' => 'nullable|email|max:180',
             'country' => 'nullable|string|max:100',
+            'country_id' => 'nullable|integer',
+            'country_code' => 'nullable|string|max:3',
+            'channel' => 'nullable|in:mobile,booth',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['status' => false, 'message' => 'Validation errors', 'errors' => $validator->errors()], 422);
         }
 
+        $country = $channels->resolveCountry($request->all());
+        if ($channel === SubscriberChannelModel::MOBILE && !$country) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation errors',
+                'errors' => ['country_id' => ['Please select a valid country.']],
+            ], 422);
+        }
+
         $fullname = $this->resolveFullname($request);
         $emailaddress = $request->input('emailaddress') ?? $request->input('email');
         $phonenumber = Msisdn::toStorage($request->input('phonenumber'));
         $phoneCandidates = Msisdn::storageCandidates($request->input('phonenumber'));
-        $country = trim((string) $request->input('country'));
 
         if ($phonenumber === null) {
             return response()->json([
@@ -55,28 +70,33 @@ class AuthController extends Controller
             ], 422);
         }
 
-        // A fully-registered account must not be created twice; tell the user to sign in.
+        // One identity can have both channels, but never twice within the same channel.
         $existingSubscriber = SubscribersModel::where('username', $request->username)
             ->orWhereIn('phonenumber', $phoneCandidates)
             ->when($emailaddress, fn ($q) => $q->orWhere('emailaddress', $emailaddress))
             ->first();
 
         if ($existingSubscriber) {
-            return response()->json([
-                'status' => false,
-                'message' => 'An account with these details already exists. Please sign in instead.',
-            ], 409);
+            $message = $existingSubscriber->hasChannel($channel)
+                ? 'An account with these details already exists. Please sign in instead.'
+                : 'An account with these details already exists. Sign in to create a ' . $channel . ' account.';
+
+            return response()->json(['status' => false, 'message' => $message], 409);
         }
 
         $otp = sprintf('%06d', random_int(0, 999999));
+        $domain = $channels->domainFor($channel, $country);
 
         $attributes = [
+            'channel' => $channel,
             'fullname' => $fullname,
             'username' => $request->username,
             'password' => Hash::make($request->password),
             'phonenumber' => $phonenumber,
             'emailaddress' => $emailaddress,
-            'country' => $country !== '' ? $country : 'Ghana',
+            'country' => $channel === SubscriberChannelModel::MOBILE ? $country?->name : null,
+            'country_id' => $channel === SubscriberChannelModel::MOBILE ? $country?->id : null,
+            'domain' => $domain,
             'otp' => $otp,
             'otp_expiration' => Carbon::now()->addMinutes(self::OTP_DEFAULT_TTL_MINUTES),
             'status' => 'pending',
@@ -84,9 +104,12 @@ class AuthController extends Controller
 
         // Reuse a still-pending registration (missed/expired OTP, re-submit) instead
         // of failing on a duplicate row that the user cannot clear themselves.
-        $pending = SubscribersTempModel::where('username', $request->username)
-            ->orWhereIn('phonenumber', $phoneCandidates)
-            ->when($emailaddress, fn ($q) => $q->orWhere('emailaddress', $emailaddress))
+        $pending = SubscribersTempModel::where('channel', $channel)
+            ->where(function ($query) use ($request, $phoneCandidates, $emailaddress) {
+                $query->where('username', $request->username)
+                    ->orWhereIn('phonenumber', $phoneCandidates)
+                    ->when($emailaddress, fn ($q) => $q->orWhere('emailaddress', $emailaddress));
+            })
             ->latest()
             ->first();
 
@@ -108,7 +131,6 @@ class AuthController extends Controller
             'status' => true,
             'message' => 'Temp subscriber created. OTP sent',
             'debug_otp' => $otp,
-
         ], 201);
     }
 
@@ -144,15 +166,33 @@ class AuthController extends Controller
             return response()->json(['status' => false, 'message' => 'OTP expired'], 400);
         }
 
+        $channel = $temp->channel ?: SubscriberChannelModel::MOBILE;
+
         $existing = SubscribersModel::where('username', $temp->username)
             ->orWhereIn('phonenumber', Msisdn::storageCandidates($temp->phonenumber))
             ->first();
         if ($existing) {
-            return response()->json(['status' => false, 'message' => 'Subscriber already registered'], 409);
+            $message = $existing->hasChannel($channel)
+                ? 'Subscriber already registered'
+                : 'An account already exists. Please sign in to create your ' . $channel . ' account.';
+
+            return response()->json(['status' => false, 'message' => $message], 409);
         }
 
-        $domain = SubscriberDomain::fromCountry($temp->country);
-        SubscriberDomain::ensureRelay($domain);
+        $channels = app(SubscriberChannelService::class);
+        $country = $channel === SubscriberChannelModel::MOBILE
+            ? $channels->resolveCountry([
+                'country_id' => $temp->country_id,
+                'country' => $temp->country,
+            ])
+            : null;
+
+        if ($channel === SubscriberChannelModel::MOBILE && !$country) {
+            return response()->json([
+                'status' => false,
+                'message' => 'A valid country is required.',
+            ], 422);
+        }
 
         $subscriberId = 'SUB_' . strtoupper(Str::random(10));
         $subscriber = SubscribersModel::create([
@@ -162,22 +202,27 @@ class AuthController extends Controller
             'password' => $temp->password,
             'phonenumber' => Msisdn::toStorage($temp->phonenumber) ?? $temp->phonenumber,
             'emailaddress' => $temp->emailaddress,
-            'country' => $temp->country,
-            'domain' => $domain,
+            'country' => $country?->name,
+            'country_id' => $country?->id,
+            'domain' => $temp->domain,
+            'has_mobile_account' => false,
+            'has_booth_account' => false,
             'authusername' => null,
             'switch_status' => 'active',
             'billing_acc_status' => 'active',
         ]);
 
-        $auth = $this->createDefaultSipAccount($subscriber);
-        $this->provisionSubscriber($subscriber, $auth, $otp);
+        $channels->createChannel($subscriber, $channel, $country, $otp);
+
+        $subscriber = $subscriber->fresh();
+        $subscriber->active_channel = $channel;
 
         $temp->delete();
 
         return response()->json([
             'status' => true,
             'message' => 'Subscriber verified and created',
-            'data' => new SubscriberResource($subscriber->fresh())
+            'data' => new SubscriberResource($subscriber)
         ]);
     }
 
@@ -192,13 +237,16 @@ class AuthController extends Controller
             return response()->json(['status' => false, 'message' => 'Username/Email and password required'], 400);
         }
 
+        $channel = $this->resolveChannel($request);
         $identifier = trim($request->username);
-
         $phoneCandidates = Msisdn::storageCandidates($identifier);
 
-        $tempUser = SubscribersTempModel::where('username', $identifier)
-            ->orWhere('emailaddress', $identifier)
-            ->when($phoneCandidates !== [], fn ($q) => $q->orWhereIn('phonenumber', $phoneCandidates))
+        $tempUser = SubscribersTempModel::where('channel', $channel)
+            ->where(function ($query) use ($identifier, $phoneCandidates) {
+                $query->where('username', $identifier)
+                    ->orWhere('emailaddress', $identifier)
+                    ->when($phoneCandidates !== [], fn ($q) => $q->orWhereIn('phonenumber', $phoneCandidates));
+            })
             ->latest()
             ->first();
 
@@ -233,8 +281,32 @@ class AuthController extends Controller
             return response()->json(['status' => false, 'message' => 'Invalid credentials'], 401);
         }
 
-        $token = auth('api')->login($subscriber);
+        if (!$subscriber->hasChannel($channel)) {
+            $setupToken = app(ChannelSetupTokenService::class)->issue($subscriber, $channel);
+            $message = $channel === SubscriberChannelModel::MOBILE
+                ? 'You do not have a mobile account yet. Please create one.'
+                : 'You do not have a booth account yet. Please create one.';
+
+            return response()->json([
+                'status' => false,
+                'message' => $message,
+                'error' => [
+                    'code' => 403,
+                    'message' => $message,
+                    'reason' => $channel . '_account_required',
+                    'details' => [
+                        'channel' => $channel,
+                        'setup_token' => $setupToken,
+                    ],
+                ],
+                'reason' => $channel . '_account_required',
+            ], 403);
+        }
+
+        $token = auth('api')->claims(['channel' => $channel])->login($subscriber);
         $ttl = (int) config('jwt.ttl', 720);
+
+        $subscriber->active_channel = $channel;
 
         return response()->json([
             'status' => true,
@@ -246,10 +318,23 @@ class AuthController extends Controller
         ]);
     }
 
-    public function refresh(): JsonResponse
+    public function refresh(Request $request): JsonResponse
     {
         try {
-            $token = auth('api')->refresh();
+            $channel = null;
+
+            if ($rawToken = $request->bearerToken()) {
+                try {
+                    $claims = app('tymon.jwt.provider.jwt')->decode($rawToken);
+                    $channel = $claims['channel'] ?? null;
+                } catch (\Throwable $exception) {
+                    $channel = null;
+                }
+            }
+
+            $token = $channel
+                ? auth('api')->claims(['channel' => $channel])->refresh()
+                : auth('api')->refresh();
         } catch (\Throwable $exception) {
             return response()->json([
                 'status' => false,
@@ -401,6 +486,75 @@ class AuthController extends Controller
         ]);
     }
 
+    public function createChannel(Request $request): JsonResponse
+    {
+        $tokens = app(ChannelSetupTokenService::class);
+        $channels = app(SubscriberChannelService::class);
+        $channel = strtolower(trim((string) $request->input('channel', $this->resolveChannel($request))));
+        if (!in_array($channel, [SubscriberChannelModel::MOBILE, SubscriberChannelModel::BOOTH], true)) {
+            return response()->json(['status' => false, 'message' => 'Invalid channel'], 422);
+        }
+
+        $setup = $tokens->consume((string) $request->bearerToken());
+        if (!$setup) {
+            return response()->json(['status' => false, 'message' => 'This setup link is invalid or has expired.'], 401);
+        }
+
+        if (($setup['channel'] ?? null) !== $channel) {
+            return response()->json(['status' => false, 'message' => 'This setup link is for a different account type.'], 403);
+        }
+
+        $subscriber = SubscribersModel::where('subscriberid', $setup['subscriberid'])->first();
+        if (!$subscriber) {
+            return response()->json(['status' => false, 'message' => 'Account not found'], 404);
+        }
+
+        if ($subscriber->hasChannel($channel)) {
+            return response()->json(['status' => false, 'message' => 'This account already has that channel.'], 409);
+        }
+
+        $country = $channel === SubscriberChannelModel::MOBILE
+            ? $channels->resolveCountry($request->all())
+            : null;
+
+        if ($channel === SubscriberChannelModel::MOBILE && !$country) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation errors',
+                'errors' => ['country_id' => ['Please select a valid country.']],
+            ], 422);
+        }
+
+        try {
+            $channels->createChannel($subscriber, $channel, $country);
+        } catch (\RuntimeException $exception) {
+            return response()->json(['status' => false, 'message' => $exception->getMessage()], 409);
+        }
+
+        $subscriber = $subscriber->fresh();
+        $token = auth('api')->claims(['channel' => $channel])->login($subscriber);
+        $ttl = (int) config('jwt.ttl', 720);
+        $subscriber->active_channel = $channel;
+
+        return response()->json([
+            'status' => true,
+            'message' => ucfirst($channel) . ' account created successfully',
+            'token' => $token,
+            'expires_in' => $ttl * 60,
+            'expires_at' => now()->addMinutes($ttl)->toIso8601String(),
+            'user' => new SubscriberResource($subscriber),
+        ]);
+    }
+
+    private function resolveChannel(Request $request): string
+    {
+        $channel = strtolower(trim((string) $request->input('channel', 'booth')));
+
+        return $channel === SubscriberChannelModel::MOBILE
+            ? SubscriberChannelModel::MOBILE
+            : SubscriberChannelModel::BOOTH;
+    }
+
     private function resolveFullname(Request $request): ?string
     {
         if ($request->filled('fullname')) {
@@ -413,48 +567,4 @@ class AuthController extends Controller
         return trim("$firstname $lastname");
     }
 
-    private function createDefaultSipAccount(SubscribersModel $subscriber): SubscriberAuthModel
-    {
-        $authusername = $this->generateUniqueSipNumber();
-        $authpassword = Str::random(8);
-
-        $auth = SubscriberAuthModel::create([
-            'subscriberid' => $subscriber->subscriberid,
-            'authusername' => $authusername,
-            'authpassword' => $authpassword,
-            'status' => 'active',
-        ]);
-
-        $subscriber->update(['authusername' => $authusername]);
-
-        return $auth;
-    }
-
-    private function generateUniqueSipNumber(): string
-    {
-        $maxAttempts = 20;
-        for ($i = 0; $i < $maxAttempts; $i++) {
-            $candidate = str_pad(random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
-            if (!SubscriberAuthModel::where('authusername', $candidate)->exists()) {
-                return $candidate;
-            }
-        }
-
-        throw new \RuntimeException('Could not generate a unique SIP number');
-    }
-
-    private function provisionSubscriber(SubscribersModel $subscriber, SubscriberAuthModel $auth, string $code): void
-    {
-        $payload = [
-            'email' => $subscriber->emailaddress,
-            'name' => $subscriber->fullname,
-            'phone' => Msisdn::toInternational($subscriber->phonenumber) ?? $subscriber->phonenumber,
-            'authusername' => $auth->authusername,
-            'authpassword' => $auth->authpassword,
-            'domain' => $subscriber->domain ?: SubscriberDomain::fromCountry($subscriber->country),
-            'code' => $code,
-        ];
-
-        app(BoothApiService::class)->provision(config('services.booth.provision_url'), $payload);
-    }
 }

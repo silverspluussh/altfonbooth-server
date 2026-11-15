@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\ApiV1;
 
 use App\Http\Controllers\SubscribersController;
+use App\Http\Resources\SubscriberResource;
 use App\Models\SubscriberAuthModel;
 use App\Models\SubscribersModel;
 use App\Services\BoothApiService;
@@ -17,19 +18,7 @@ class SubscriberController
 
         return response()->json([
             'status' => true,
-            'data' => [
-                'subscriberid' => $subscriber->subscriberid,
-                'firstname' => $subscriber->firstname ?? null,
-                'lastname' => $subscriber->lastname ?? null,
-                'fullname' => $subscriber->fullname,
-                'username' => $subscriber->username,
-                'emailaddress' => $subscriber->emailaddress,
-                'phonenumber' => $subscriber->phonenumber,
-                'country' => $subscriber->country,
-                'domain' => $subscriber->domain,
-                'authusername' => $subscriber->authusername,
-                'authpassword' => $subscriber->auth?->authpassword,
-            ],
+            'data' => (new SubscriberResource($subscriber))->resolve(),
         ]);
     }
 
@@ -76,6 +65,7 @@ class SubscriberController
 
         $authExists = SubscriberAuthModel::where('authusername', $request->authusername)
             ->where('subscriberid', $subscriber->subscriberid)
+            ->where('channel', $this->channel($request))
             ->exists();
 
         if (!$authExists) {
@@ -135,6 +125,7 @@ class SubscriberController
 
         $authExists = SubscriberAuthModel::where('authusername', $request->authusername)
             ->where('subscriberid', $subscriber->subscriberid)
+            ->where('channel', $this->channel($request))
             ->exists();
 
         if (!$authExists) {
@@ -150,6 +141,17 @@ class SubscriberController
             'status' => true,
             'data' => ['url' => $url],
         ]);
+    }
+
+    private function channel(Request $request): string
+    {
+        try {
+            $channel = auth('api')->payload()->get('channel');
+        } catch (\Throwable $exception) {
+            $channel = null;
+        }
+
+        return in_array($channel, ['mobile', 'booth'], true) ? $channel : 'mobile';
     }
 
     private function splitFullname(string $fullname): array

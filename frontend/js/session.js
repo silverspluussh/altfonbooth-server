@@ -307,7 +307,10 @@
             const { response, data } = result;
 
             if (response.status === 429) {
-                throw new Error(data.message || 'Too many requests. Please wait a moment and try again.');
+                const error = new Error(data.message || 'Too many requests. Please wait a moment and try again.');
+                error.data = data;
+                error.status = response.status;
+                throw error;
             }
 
             if (response.status === 401) {
@@ -316,7 +319,10 @@
             }
 
             if (!response.ok) {
-                throw new Error(data.message || data.reason || 'Something went wrong');
+                const error = new Error(data.message || data.reason || 'Something went wrong');
+                error.data = data;
+                error.status = response.status;
+                throw error;
             }
 
             return data;

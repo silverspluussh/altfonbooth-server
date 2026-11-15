@@ -8,6 +8,7 @@ class SubscriberAuthModel extends Model
     protected $primaryKey = 'id';
     protected $fillable = [
         'subscriberid',
+        'channel',
         'authusername',
         'authpassword',
         'status'

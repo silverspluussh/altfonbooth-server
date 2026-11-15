@@ -2,12 +2,18 @@
 
 use App\Http\Controllers\ApiV1\AuthController;
 use App\Http\Controllers\ApiV1\SubscriberController;
+use App\Http\Controllers\CountryController;
 use Illuminate\Support\Facades\Route;
 
 // Legacy CodeIgniter API surface, served by the Laravel engine.
 // Same Tymon auth guard as /api/*; response envelope + field names follow
 // the legacy `api/v1` contract.
 Route::prefix('api/v1')->middleware(['v1.normalize', 'v1.envelope'])->group(function () {
+
+    Route::middleware('throttle:60,1')->group(function () {
+        Route::get('countries', [CountryController::class, 'index']);
+        Route::post('account-channels', [AuthController::class, 'createChannel']);
+    });
 
     Route::middleware('throttle:5,1')->group(function () {
         Route::post('register', [AuthController::class, 'register']);

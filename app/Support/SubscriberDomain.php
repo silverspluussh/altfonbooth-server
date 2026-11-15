@@ -7,6 +7,7 @@ use App\Models\VoiceRelay;
 final class SubscriberDomain
 {
     public const DEFAULT_DOMAIN = 'ghana.altfon.net';
+    public const BOOTH_DOMAIN = 'booth.altfon.net';
 
     public static function fromCountry(?string $country): string
     {

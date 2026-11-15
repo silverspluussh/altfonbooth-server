@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\AdminController;
+use App\Models\Country;
 use App\Models\SubscribersModel;
 use App\Models\VoiceRelay;
 use App\Support\SubscriberDomain;
@@ -34,6 +35,7 @@ class SubscriberDomainTest extends TestCase
             'phonenumber' => $phone,
             'fullname' => 'Domain Test',
             'emailaddress' => $username . '@example.com',
+            'channel' => 'mobile',
         ];
 
         if ($country !== null) {
@@ -102,37 +104,44 @@ class SubscriberDomainTest extends TestCase
         });
     }
 
-    public function test_missing_country_defaults_to_ghana(): void
+    public function test_missing_country_is_rejected_for_mobile_signup(): void
     {
-        $this->seedRelay();
         Http::fake();
 
-        $signup = $this->signup('domaindefault', '0249335602', null);
-
-        $this->postJson('/api/verify', [
-            'phonenumber' => '0249335602',
-            'otp' => $signup['debug_otp'],
-        ])->assertOk()
-            ->assertJsonPath('data.domain', 'ghana.altfon.net');
-
-        $this->assertDatabaseHas('subscribers', [
+        $response = $this->postJson('/api/signup', [
             'username' => 'domaindefault',
-            'domain' => 'ghana.altfon.net',
+            'password' => 'Password123',
+            'confirm_password' => 'Password123',
+            'phonenumber' => '0249335602',
+            'fullname' => 'Domain Default',
+            'emailaddress' => 'domaindefault@example.com',
+            'channel' => 'mobile',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['country_id']);
+
+        $this->assertDatabaseMissing('subscribers_temp', [
+            'username' => 'domaindefault',
         ]);
     }
 
     public function test_admin_create_and_update_manage_the_domain(): void
     {
         $this->seedRelay();
+        Http::fake();
 
         $controller = app(AdminController::class);
+        $uk = Country::where('name', 'United Kingdom')->firstOrFail();
+        $nigeria = Country::where('name', 'Nigeria')->firstOrFail();
 
         $create = Request::create('/api/admin/subscribers', 'POST', [
             'fullname' => 'Admin Domain',
             'username' => 'admindomain',
             'emailaddress' => 'admindomain@example.com',
             'phonenumber' => '0249335603',
-            'country' => 'United Kingdom',
+            'country_id' => $uk->id,
+            'has_mobile_account' => true,
             'password' => 'Password123',
         ]);
 
@@ -142,11 +151,9 @@ class SubscriberDomainTest extends TestCase
         $this->assertSame('unitedkingdom.altfon.net', $created['data']['domain']);
         $this->assertDatabaseHas('voice_relay', ['domain' => 'unitedkingdom.altfon.net']);
 
-        // The admin form pre-fills the current domain; changing only the
-        // country must still recompute the derived domain.
         $update = Request::create('/api/admin/subscribers/' . $subscriberid, 'PUT', [
-            'country' => 'Nigeria',
-            'domain' => 'unitedkingdom.altfon.net',
+            'country_id' => $nigeria->id,
+            'has_mobile_account' => true,
         ]);
 
         $updated = $controller->updateSubscriber($update, $subscriberid)->getData(true);
@@ -156,15 +163,7 @@ class SubscriberDomainTest extends TestCase
             'subscriberid' => $subscriberid,
             'domain' => 'nigeria.altfon.net',
         ]);
-
-        $override = Request::create('/api/admin/subscribers/' . $subscriberid, 'PUT', [
-            'domain' => 'custom.altfon.net',
-        ]);
-
-        $overridden = $controller->updateSubscriber($override, $subscriberid)->getData(true);
-
-        $this->assertSame('custom.altfon.net', $overridden['data']['domain']);
-        $this->assertDatabaseHas('voice_relay', ['domain' => 'custom.altfon.net']);
+        $this->assertDatabaseHas('voice_relay', ['domain' => 'nigeria.altfon.net']);
     }
 
     public function test_subscriber_model_exposes_domain(): void

@@ -8,16 +8,23 @@ class SubscribersTempModel extends Model
     protected $primaryKey = 'recid';
     protected $fillable = [
         'subscriberid',
+        'channel',
         'fullname',
         'username',
         'password',
         'phonenumber',
         'emailaddress',
         'country',
+        'country_id',
+        'domain',
         'otp',
         'otp_expiration',
         'verify_code',
         'status'
+    ];
+
+    protected $casts = [
+        'country_id' => 'integer',
     ];
 
     public $timestamps = true;

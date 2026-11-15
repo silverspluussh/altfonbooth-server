@@ -177,7 +177,46 @@
             }, 1000);
 
         } catch (error) {
-            UI.showToast(error.message, 'error');
+            const reason = error?.data?.error?.reason;
+            const details = error?.data?.error?.details || {};
+
+            if (reason === 'booth_account_required' && details.setup_token) {
+                const shouldCreate = window.confirm(
+                    'You do not have a booth account yet. Create one now?'
+                );
+
+                if (shouldCreate) {
+                    try {
+                        const created = await fetch(`${CONFIG.API_BASE}/account-channels`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'Authorization': `Bearer ${details.setup_token}`,
+                            },
+                            body: JSON.stringify({ channel: 'booth' }),
+                        });
+
+                        const payload = await created.json();
+
+                        if (!created.ok || payload.status !== true || !payload.token) {
+                            throw new Error(payload.message || 'Could not create a booth account.');
+                        }
+
+                        UserSession.setSession(payload.token, payload.user);
+                        UI.showToast('Booth account created! Redirecting...');
+                        setTimeout(() => {
+                            window.location.href = nextPage();
+                        }, 1000);
+                        return;
+                    } catch (createError) {
+                        UI.showToast(createError.message, 'error');
+                    }
+                }
+            } else {
+                UI.showToast(error.message, 'error');
+            }
+
             btn.disabled = false;
             btn.innerText = 'LOGIN NOW';
         }

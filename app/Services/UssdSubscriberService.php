@@ -61,10 +61,21 @@ class UssdSubscriberService
 
     public function accountSummaries(SubscribersModel $subscriber): Collection
     {
-        return $this->accountsFor($subscriber)->map(function (SubscriberAuthModel $account) use ($subscriber) {
+        $profiles = \App\Models\SubscriberChannelModel::where('subscriberid', $subscriber->subscriberid)
+            ->get()
+            ->keyBy('channel');
+
+        return $this->accountsFor($subscriber)->map(function (SubscriberAuthModel $account) use ($subscriber, $profiles) {
+            $channel = $account->channel ?: 'mobile';
+            $profile = $profiles->get($channel);
+
             return [
                 'authusername' => $account->authusername,
-                'isDefault' => $account->authusername === $subscriber->authusername,
+                'channel' => $channel,
+                'domain' => $profile?->domain,
+                'isDefault' => $profile
+                    ? (int) $profile->default_auth_id === (int) $account->id
+                    : $account->authusername === $subscriber->authusername,
                 'status' => $account->status ?: 'active',
             ];
         })->values();

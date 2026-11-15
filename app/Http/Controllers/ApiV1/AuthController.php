@@ -10,6 +10,7 @@ class AuthController
 {
     public function register(Request $request): JsonResponse
     {
+        $request->merge(['channel' => 'mobile']);
         $response = app(ApiAuthController::class)->signup($request);
         $payload = $response->getData(true);
 
@@ -35,6 +36,7 @@ class AuthController
 
     public function login(Request $request): JsonResponse
     {
+        $request->merge(['channel' => 'mobile']);
         $response = app(ApiAuthController::class)->login($request);
         $payload = $response->getData(true);
 
@@ -52,26 +54,48 @@ class AuthController
             ]);
         }
 
+        return $this->sessionResponse($payload, 'Logged in successfully');
+    }
+
+    public function createChannel(Request $request): JsonResponse
+    {
+        $request->merge(['channel' => 'mobile']);
+        $response = app(ApiAuthController::class)->createChannel($request);
+        $payload = $response->getData(true);
+
+        if (($payload['status'] ?? false) !== true) {
+            return $response;
+        }
+
+        return $this->sessionResponse($payload, $payload['message'] ?? 'Mobile account created successfully');
+    }
+
+    private function sessionResponse(array $payload, string $message): JsonResponse
+    {
         $user = $payload['user'] ?? [];
         [$firstname, $lastname] = $this->splitFullname($user['fullname'] ?? '');
 
         $data = [
             'access_token' => $payload['token'] ?? '',
             'subscriberid' => $user['subscriberid'] ?? null,
-            'firstname' => $firstname,
-            'lastname' => $lastname,
+            'firstname' => $user['firstname'] ?? $firstname,
+            'lastname' => $user['lastname'] ?? $lastname,
             'username' => $user['username'] ?? null,
             'emailaddress' => $user['emailaddress'] ?? null,
             'phonenumber' => $user['phonenumber'] ?? null,
             'country' => $user['country'] ?? null,
+            'country_id' => $user['country_id'] ?? null,
             'domain' => $user['domain'] ?? null,
+            'channel' => $user['channel'] ?? null,
+            'has_mobile_account' => $user['has_mobile_account'] ?? false,
+            'has_booth_account' => $user['has_booth_account'] ?? false,
             'authusername' => $user['authusername'] ?? null,
             'authpassword' => $user['authpassword'] ?? null,
         ];
 
         return response()->json([
             'status' => true,
-            'message' => 'Logged in successfully',
+            'message' => $message,
             'data' => $data,
         ]);
     }

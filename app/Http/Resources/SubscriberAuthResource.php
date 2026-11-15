@@ -13,6 +13,7 @@ class SubscriberAuthResource extends JsonResource
         return [
             'id' => $this->id,
             'subscriberid' => $this->subscriberid,
+            'channel' => $this->channel ?: 'mobile',
             'authusername' => $this->authusername,
             'authpassword' => $this->authpassword,
             'balance' => $this->balance,

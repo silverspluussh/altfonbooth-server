@@ -58,6 +58,7 @@ const AdminRouter = {
         'login': renderLogin,
         'dashboard': renderDashboard,
         'subscribers': renderSubscribers,
+        'countries': renderCountries,
         'auth-users': renderAuthUsers,
         'destinations': renderDestinations,
         'purchase-history': renderPurchaseHistory,
@@ -354,6 +355,13 @@ function filterSubscribers() {
     updatePaginatedTable('subs-table', filtered);
 }
 
+function accountTags(s) {
+    const tags = [];
+    if (s.has_mobile_account) tags.push('<span class="badge badge-primary">Mobile</span>');
+    if (s.has_booth_account) tags.push('<span class="badge badge-warning">Booth</span>');
+    return tags.length ? tags.join(' ') : '<span class="badge">None</span>';
+}
+
 function renderSubscribersTable(list) {
     initPaginatedTable('subs-table', 'subs-content', list, [
         { label: 'ID', render: s => `<code>${UI.esc(s.subscriberid)}</code>` },
@@ -361,6 +369,7 @@ function renderSubscribersTable(list) {
         { label: 'Email', key: 'emailaddress' },
         { label: 'Username', key: 'username' },
         { label: 'Phone', key: 'phonenumber' },
+        { label: 'Accounts', render: s => accountTags(s) },
         { label: 'Country', key: 'country' },
         { label: 'Domain', key: 'domain' },
     ], [
@@ -369,9 +378,23 @@ function renderSubscribersTable(list) {
     ]);
 }
 
-function showSubscriberModal(sub = null) {
+async function showSubscriberModal(sub = null) {
     const isEdit = !!sub;
     const title = isEdit ? 'Edit Subscriber' : 'Add Subscriber';
+
+    let countries = [];
+    try {
+        const res = await adminApiRequest('/admin/countries');
+        countries = res.data || [];
+    } catch (e) {
+        UI.showToast(e.message, 'error');
+        return;
+    }
+
+    const countryOptions = countries.map(c =>
+        `<option value="${c.id}" ${String(c.id) === String(sub?.country_id) ? 'selected' : ''}>${UI.esc(c.name)}${c.domain ? ' — ' + UI.esc(c.domain) : ''}</option>`
+    ).join('');
+
     const html = `
         <form id="sub-form">
             <label>Full Name *</label>
@@ -382,17 +405,41 @@ function showSubscriberModal(sub = null) {
             <input name="emailaddress" type="email" value="${UI.esc(sub?.emailaddress || '')}" required>
             <label>Phone</label>
             <input name="phonenumber" value="${UI.esc(sub?.phonenumber || '')}">
-            <label>Country</label>
-            <input name="country" value="${UI.esc(sub?.country || '')}">
-            <label>Domain</label>
-            <input name="domain" value="${UI.esc(sub?.domain || '')}" placeholder="Blank = derive from country">
+            <label>Account Type</label>
+            <div class="checkbox-row">
+                <label><input type="checkbox" name="has_mobile_account" ${sub?.has_mobile_account || !isEdit ? 'checked' : ''}> Mobile</label>
+                <label><input type="checkbox" name="has_booth_account" ${sub?.has_booth_account ? 'checked' : ''}> Booth</label>
+            </div>
+            <label>Mobile Country</label>
+            <select name="country_id">
+                <option value="">Select country</option>
+                ${countryOptions}
+            </select>
+            <p class="form-hint">The mobile domain comes from the country. Booth accounts always use booth.altfon.net.</p>
             ${isEdit ? '' : '<label>Password *</label><input name="password" type="password" required>'}
         </form>
     `;
 
     showModal(title, html, async () => {
         const form = document.getElementById('sub-form');
-        const data = Object.fromEntries(new FormData(form));
+        const raw = Object.fromEntries(new FormData(form));
+        const data = {
+            fullname: raw.fullname,
+            username: raw.username,
+            emailaddress: raw.emailaddress,
+            phonenumber: raw.phonenumber,
+            country_id: raw.country_id || null,
+            has_mobile_account: form.querySelector('[name="has_mobile_account"]').checked,
+            has_booth_account: form.querySelector('[name="has_booth_account"]').checked,
+        };
+        if (!isEdit) {
+            data.password = raw.password;
+        } else if (raw.password) {
+            data.password = raw.password;
+        }
+        if (!data.has_mobile_account && !data.has_booth_account) {
+            throw new Error('Select at least one account type.');
+        }
         if (isEdit) {
             await adminApiRequest(`/admin/subscribers/${sub.subscriberid}`, {
                 method: 'PUT', body: JSON.stringify(data)
@@ -449,6 +496,8 @@ function renderAuthUsersTable(list) {
     initPaginatedTable('auth-table', 'auth-users-content', list, [
         { label: 'ID', key: 'id' },
         { label: 'Subscriber ID', key: 'subscriberid' },
+        { label: 'Channel', render: a => `<span class="badge badge-${a.channel === 'booth' ? 'warning' : 'primary'}">${UI.esc(a.channel || 'mobile')}</span>` },
+        { label: 'Domain', render: a => `<code>${UI.esc(a.domain || '')}</code>` },
         { label: 'SIP Number', key: 'authusername' },
         { label: 'Balance (GH₵)', render: a => Number(a.balance || 0).toFixed(2) },
         { label: 'Status', render: a => `<span class="badge badge-${a.status === 'active' ? 'success' : 'danger'}">${UI.esc(a.status)}</span>` },
@@ -503,6 +552,11 @@ async function showAuthUserModal(auth = null) {
         <form id="auth-form">
             <label>Subscriber ${isEdit ? '' : '*'} ${isEdit ? `<code>${UI.esc(auth.subscriberid)}</code>` : ''}</label>
             ${isEdit ? '' : `<select name="subscriberid" required><option value="">Select subscriber...</option>${subOptions}</select>`}
+            <label>Channel *</label>
+            <select name="channel" ${isEdit ? '' : 'required'}>
+                <option value="mobile" ${(!auth || auth.channel === 'mobile') ? 'selected' : ''}>Mobile</option>
+                <option value="booth" ${auth?.channel === 'booth' ? 'selected' : ''}>Booth</option>
+            </select>
             <label>SIP Number *</label>
             <input name="authusername" value="${UI.esc(auth?.authusername || '')}" ${isEdit ? '' : 'required'} ${isEdit ? 'readonly style="background:#f1f5f9"' : ''}>
             <label>Password</label>
@@ -772,6 +826,116 @@ function confirmDeleteAdmin(admin) {
 }
 
 // ---- SETTINGS ----
+let _countriesCache = [];
+
+async function renderCountries() {
+    const container = document.getElementById('app-content');
+    container.innerHTML = `
+        <div class="page-header">
+            <h2><i class="fa fa-globe"></i> Countries</h2>
+            <button class="btn btn-primary" onclick="showCountryModal()"><i class="fa fa-plus"></i> Add Country</button>
+        </div>
+        <div id="countries-content"><p class="loading-state">Loading countries...</p></div>
+    `;
+
+    try {
+        const res = await adminApiRequest('/admin/countries');
+        const countries = res.data || [];
+        _countriesCache = countries;
+        document.getElementById('countries-content').innerHTML = `
+            <div class="table-wrap"><table>
+                <thead><tr>
+                    <th>Name</th><th>ISO</th><th>Dial</th><th>Domain</th><th>Active</th><th>Sort</th><th>Actions</th>
+                </tr></thead>
+                <tbody>
+                    ${countries.map(c => `
+                        <tr>
+                            <td>${UI.esc(c.name)}</td>
+                            <td>${UI.esc(c.iso_code || '')}</td>
+                            <td>${UI.esc(c.dial_code || '')}</td>
+                            <td><code>${UI.esc(c.domain)}</code></td>
+                            <td><span class="badge ${c.is_active ? 'badge-success' : 'badge-danger'}">${c.is_active ? 'Active' : 'Inactive'}</span></td>
+                            <td>${c.sort_order}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline" onclick="showCountryModalById(${c.id})">Edit</button>
+                                <button class="btn btn-sm btn-outline" onclick="applyCountryDomain(${c.id})">Apply Domain</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteCountry(${c.id})">Delete</button>
+                            </td>
+                        </tr>
+                    `).join('') || '<tr><td colspan="7">No countries yet.</td></tr>'}
+                </tbody>
+            </table></div>
+        `;
+    } catch (e) {
+        document.getElementById('countries-content').innerHTML = `<p class="error-state">${e.message}</p>`;
+    }
+}
+
+function showCountryModal(country = null) {
+    const isEdit = !!country;
+    const html = `
+        <form id="country-form">
+            <label>Name *</label>
+            <input name="name" value="${UI.esc(country?.name || '')}" required>
+            <label>ISO Code</label>
+            <input name="iso_code" maxlength="3" value="${UI.esc(country?.iso_code || '')}" placeholder="e.g. GH">
+            <label>Dial Code</label>
+            <input name="dial_code" value="${UI.esc(country?.dial_code || '')}" placeholder="e.g. 233">
+            <label>Domain *</label>
+            <input name="domain" value="${UI.esc(country?.domain || '')}" placeholder="e.g. ghana.altfon.net" required>
+            <label>Sort Order</label>
+            <input name="sort_order" type="number" value="${country?.sort_order ?? 0}">
+            <label><input type="checkbox" name="is_active" ${country?.is_active === false ? '' : 'checked'}> Active</label>
+        </form>
+    `;
+
+    showModal(isEdit ? 'Edit Country' : 'Add Country', html, async () => {
+        const form = document.getElementById('country-form');
+        const raw = Object.fromEntries(new FormData(form));
+        const data = {
+            name: raw.name,
+            iso_code: raw.iso_code || null,
+            dial_code: raw.dial_code || null,
+            domain: raw.domain,
+            sort_order: parseInt(raw.sort_order || '0', 10),
+            is_active: form.querySelector('[name="is_active"]').checked,
+        };
+        if (isEdit) {
+            await adminApiRequest(`/admin/countries/${country.id}`, {
+                method: 'PUT', body: JSON.stringify(data)
+            });
+            UI.showToast('Country updated');
+        } else {
+            await adminApiRequest('/admin/countries', {
+                method: 'POST', body: JSON.stringify(data)
+            });
+            UI.showToast('Country created');
+        }
+        await renderCountries();
+    }, isEdit ? 'Update' : 'Create');
+}
+
+function showCountryModalById(id) {
+    const country = _countriesCache.find((item) => Number(item.id) === Number(id));
+    showCountryModal(country || null);
+}
+
+async function deleteCountry(id) {
+    const country = _countriesCache.find((item) => Number(item.id) === Number(id));
+    showConfirm(`Delete country <strong>${UI.esc(country?.name || 'this country')}</strong>?`, async () => {
+        await adminApiRequest(`/admin/countries/${id}`, { method: 'DELETE' });
+        UI.showToast('Country deleted');
+        await renderCountries();
+    });
+}
+
+async function applyCountryDomain(id) {
+    showConfirm('Apply this country domain to all existing mobile accounts?', async () => {
+        const res = await adminApiRequest(`/admin/countries/${id}/apply-domain`, { method: 'POST' });
+        UI.showToast(`Domain applied to ${res.updated ?? 0} account(s)`);
+    });
+}
+
 async function renderSettings() {
     const user = AdminAuth.getUser();
     const container = document.getElementById('app-content');

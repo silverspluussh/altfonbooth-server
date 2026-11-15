@@ -6,6 +6,7 @@ use App\Http\Resources\SubscriberDestResource;
 use App\Http\Resources\SubscriberResource;
 use App\Models\PrepaidCredit;
 use App\Models\SubscriberAuthModel;
+use App\Models\SubscriberChannelModel;
 use App\Models\SubscriberDestModel;
 use App\Models\SubscribersModel;
 use App\Models\VoiceRelay;
@@ -29,6 +30,31 @@ class SubscribersController extends Controller
         $parts = preg_split('/\s+/', trim($fullname), 2);
 
         return [$parts[0] ?? '', $parts[1] ?? ''];
+    }
+
+    private function currentChannel(Request $request): string
+    {
+        $channel = $request->attributes->get('channel');
+
+        if (!$channel) {
+            try {
+                $channel = auth('api')->payload()->get('channel');
+            } catch (\Throwable $exception) {
+                $channel = null;
+            }
+        }
+
+        return in_array($channel, [SubscriberChannelModel::MOBILE, SubscriberChannelModel::BOOTH], true)
+            ? $channel
+            : SubscriberChannelModel::MOBILE;
+    }
+
+    private function authInChannel(string $subscriberid, string $authusername, string $channel): bool
+    {
+        return SubscriberAuthModel::where('subscriberid', $subscriberid)
+            ->where('authusername', $authusername)
+            ->where('channel', $channel)
+            ->exists();
     }
 
 
@@ -98,32 +124,40 @@ class SubscribersController extends Controller
 
     public function updateAuthUsername(Request $request): JsonResponse
     {
-        $request->validate([
-            'authusername' => 'required|regex:/^\d+$/|unique:subscriber_auth,authusername,' . ($request->user()->auth?->id ?? 'NULL'),
-        ]);
-
         $subscriber = $request->user();
-        
-        // 1. Update the main subscriber record
-        $subscriber->update(['authusername' => $request->authusername]);
+        $channel = $this->currentChannel($request);
+        $existing = SubscriberAuthModel::where('subscriberid', $subscriber->subscriberid)
+            ->where('channel', $channel)
+            ->first();
 
-        // 2. Update or Create the detailed auth record
-        $existing = SubscriberAuthModel::where('subscriberid', $subscriber->subscriberid)->first();
+        $request->validate([
+            'authusername' => 'required|regex:/^\d+$/|unique:subscriber_auth,authusername,' . ($existing?->id ?? 'NULL'),
+        ]);
 
         if ($existing) {
             $existing->update(['authusername' => $request->authusername]);
         } else {
-            SubscriberAuthModel::create([
+            $existing = SubscriberAuthModel::create([
                 'subscriberid' => $subscriber->subscriberid,
+                'channel' => $channel,
                 'authusername' => $request->authusername,
                 'authpassword' => '',
                 'status' => 'active'
             ]);
+
+            $profile = $subscriber->channelProfile($channel);
+            if ($profile && !$profile->default_auth_id) {
+                $profile->update(['default_auth_id' => $existing->id]);
+            }
+        }
+
+        if ($channel === SubscriberChannelModel::MOBILE) {
+            $subscriber->update(['authusername' => $request->authusername]);
         }
 
         return response()->json([
             'status' => true,
-            'message' => 'Auth username updated successfully in both user profile and auth records'
+            'message' => 'Auth username updated successfully'
         ]);
     }
 
@@ -162,6 +196,7 @@ class SubscribersController extends Controller
         $subscriber = $request->user();
         $auth = SubscriberAuthModel::where('id', $request->id)
             ->where('subscriberid', $subscriber->subscriberid)
+            ->where('channel', $this->currentChannel($request))
             ->first();
 
         if (!$auth) {
@@ -192,14 +227,18 @@ class SubscribersController extends Controller
     public function listAuthUsers(Request $request): JsonResponse
     {
         $subscriber = $request->user();
-        $auths = SubscriberAuthModel::where('subscriberid', $subscriber->subscriberid)->get();
+        $channel = $this->currentChannel($request);
+        $auths = SubscriberAuthModel::where('subscriberid', $subscriber->subscriberid)
+            ->where('channel', $channel)
+            ->get();
 
-        $result = $auths->map(function ($auth) {
+        $result = $auths->map(function ($auth) use ($channel) {
             $response = $this->booth()->getBalance($auth->authusername);
 
             return [
                 'id' => $auth->id,
                 'subscriberid' => $auth->subscriberid,
+                'channel' => $channel,
                 'authusername' => $auth->authusername,
                 'authpassword' => $auth->authpassword,
                 'balance' => $this->booth()->extractBalance($response) ?? 0.00,
@@ -224,6 +263,7 @@ class SubscribersController extends Controller
         $subscriber = $request->user();
         $auth = SubscriberAuthModel::where('authusername', $request->authusername)
             ->where('subscriberid', $subscriber->subscriberid)
+            ->where('channel', $this->currentChannel($request))
             ->first();
 
         if (!$auth) {
@@ -272,6 +312,7 @@ class SubscribersController extends Controller
 
         $auth = SubscriberAuthModel::create([
             'subscriberid' => $subscriber->subscriberid,
+            'channel' => $this->currentChannel($request),
             'authusername' => $authusername,
             'authpassword' => $authpassword,
             'status' => 'active'
@@ -296,9 +337,11 @@ class SubscribersController extends Controller
         $subscriber = $request->user();
 
         // Security: Ensure the authusername belongs to the authenticated subscriber
-        $authExists = SubscriberAuthModel::where('authusername', $request->authusername)
-            ->where('subscriberid', $subscriber->subscriberid)
-            ->exists();
+        $authExists = $this->authInChannel(
+            $subscriber->subscriberid,
+            $request->authusername,
+            $this->currentChannel($request),
+        );
 
         if (!$authExists) {
             return response()->json(['status' => false, 'message' => 'Unauthorized: This SIP account does not belong to you.'], 403);
@@ -338,6 +381,10 @@ class SubscribersController extends Controller
 
         $subscriber = $request->user();
 
+        if (!$this->authInChannel($subscriber->subscriberid, $request->authusername, $this->currentChannel($request))) {
+            return response()->json(['status' => false, 'message' => 'Unauthorized: This SIP account does not belong to you.'], 403);
+        }
+
         $deleted = SubscriberDestModel::where('subscriberid', $subscriber->subscriberid)
             ->where('authusername', $request->authusername)
             ->where('destination', $request->destination)
@@ -362,7 +409,13 @@ class SubscribersController extends Controller
             return response()->json(['status' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        $list = SubscriberDestModel::where('subscriberid', $subscriber->subscriberid)->get();
+        $authUsernames = SubscriberAuthModel::where('subscriberid', $subscriber->subscriberid)
+            ->where('channel', $this->currentChannel($request))
+            ->pluck('authusername');
+
+        $list = SubscriberDestModel::where('subscriberid', $subscriber->subscriberid)
+            ->whereIn('authusername', $authUsernames)
+            ->get();
 
         return response()->json([
             'status' => true,
@@ -400,9 +453,10 @@ class SubscribersController extends Controller
             return response()->json(['status' => false, 'message' => 'User not authenticated'], 401);
         }
         
-        // Ensure the authusername belongs to the current subscriber
+        // Ensure the authusername belongs to the current subscriber and channel
         $auth = SubscriberAuthModel::where('authusername', $request->authusername)
             ->where('subscriberid', $subscriber->subscriberid)
+            ->where('channel', $this->currentChannel($request))
             ->first();
 
         if (!$auth) {
@@ -528,6 +582,7 @@ class SubscribersController extends Controller
                 if ($subscriber) {
                     $ownsAccount = SubscriberAuthModel::where('authusername', $authusername)
                         ->where('subscriberid', $subscriber->subscriberid)
+                        ->where('channel', $this->currentChannel($request))
                         ->exists();
 
                     if (!$ownsAccount) {
@@ -620,6 +675,7 @@ class SubscribersController extends Controller
         $subscriber = $request->user();
 
         $authUsernames = SubscriberAuthModel::where('subscriberid', $subscriber->subscriberid)
+            ->where('channel', $this->currentChannel($request))
             ->pluck('authusername');
 
         $history = PrepaidCredit::whereIn('authusername', $authUsernames)
@@ -649,9 +705,11 @@ class SubscribersController extends Controller
 
         $subscriber = $request->user();
 
-        $authExists = SubscriberAuthModel::where('authusername', $request->authusername)
-            ->where('subscriberid', $subscriber->subscriberid)
-            ->exists();
+        $authExists = $this->authInChannel(
+            $subscriber->subscriberid,
+            $request->authusername,
+            $this->currentChannel($request),
+        );
 
         if (!$authExists) {
             return response()->json(['status' => false, 'message' => 'Unauthorized: This SIP account does not belong to you.'], 403);

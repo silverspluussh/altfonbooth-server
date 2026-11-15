@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Internal;
 
 use App\Http\Controllers\Controller;
 use App\Models\SubscriberAuthModel;
+use App\Models\SubscriberChannelModel;
 use App\Models\SubscribersModel;
 use App\Services\BoothApiService;
 use App\Services\UssdSignupSmsService;
@@ -100,10 +101,21 @@ class UssdController extends Controller
             ? $this->booth->getBalances($accounts->pluck('authusername')->all())
             : [];
 
-        $items = $accounts->map(function (SubscriberAuthModel $account) use ($subscriber, $withBalance, $balances) {
+        $profiles = SubscriberChannelModel::where('subscriberid', $subscriber->subscriberid)
+            ->get()
+            ->keyBy('channel');
+
+        $items = $accounts->map(function (SubscriberAuthModel $account) use ($subscriber, $withBalance, $balances, $profiles) {
+            $channel = $account->channel ?: SubscriberChannelModel::MOBILE;
+            $profile = $profiles->get($channel);
+
             $item = [
                 'authusername' => $account->authusername,
-                'isDefault' => $account->authusername === $subscriber->authusername,
+                'channel' => $channel,
+                'domain' => $profile?->domain,
+                'isDefault' => $profile
+                    ? (int) $profile->default_auth_id === (int) $account->id
+                    : $account->authusername === $subscriber->authusername,
                 'status' => $account->status ?: 'active',
             ];
 
