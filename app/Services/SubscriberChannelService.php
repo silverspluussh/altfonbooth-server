@@ -74,7 +74,7 @@ class SubscriberChannelService
             'subscriberid' => $subscriber->subscriberid,
             'channel' => $channel,
             'authusername' => $this->generateUniqueSipNumber(),
-            'authpassword' => Str::random(8),
+            'authpassword' => Str::random(SubscriberAuthModel::PASSWORD_LENGTH),
             'status' => 'active',
         ]);
 

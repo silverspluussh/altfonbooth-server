@@ -138,9 +138,11 @@ class InternalUssdRechargeApiTest extends TestCase
         ]);
 
         Http::assertSent(function ($request) {
-            return str_contains($request->url(), 'booth_topup.php')
+            return $request->method() === 'POST'
+                && str_contains($request->url(), 'booth_topup.php')
                 && $request['accesscode'] === '7022875'
-                && (float) $request['amount'] === 10.0;
+                && (float) $request['amount'] === 10.0
+                && $request['domain'] === 'ghana.altfon.net';
         });
     }
 

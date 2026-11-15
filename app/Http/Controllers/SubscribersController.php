@@ -190,7 +190,7 @@ class SubscribersController extends Controller
         $request->validate([
             'id' => 'required|exists:subscriber_auth,id',
             'authusername' => 'required|regex:/^\d+$/',
-            'authpassword' => 'nullable|string'
+            'authpassword' => 'nullable|string|min:' . SubscriberAuthModel::PASSWORD_LENGTH . '|max:255'
         ]);
 
         $subscriber = $request->user();
@@ -307,8 +307,8 @@ class SubscribersController extends Controller
             return response()->json(['status' => false, 'message' => 'Could not generate a unique SIP number. Please try again.'], 500);
         }
 
-        // Auto-generate an 8-character alphanumeric password
-        $authpassword = Str::random(8);
+        // Auto-generate a 16-character alphanumeric password
+        $authpassword = Str::random(SubscriberAuthModel::PASSWORD_LENGTH);
 
         $auth = SubscriberAuthModel::create([
             'subscriberid' => $subscriber->subscriberid,

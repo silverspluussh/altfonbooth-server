@@ -200,7 +200,7 @@ class InternalUssdApiTest extends TestCase
         $this->createAccount('SUB_USSD1', '7022875');
 
         Http::fake([
-            '*/booth_getbal.php' => Http::response(['status' => 'success', 'balance' => '42.50'], 200),
+            '*/booth_getbal.php*' => Http::response(['status' => 'success', 'balance' => '42.50'], 200),
         ]);
 
         $response = $this->internal()->postJson('/api/internal/ussd/balance', [
@@ -211,6 +211,13 @@ class InternalUssdApiTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.authusername', '7022875')
             ->assertJsonPath('data.balance', 42.5);
+
+        Http::assertSent(function ($request) {
+            return $request->method() === 'GET'
+                && str_contains($request->url(), 'booth_getbal.php')
+                && $request['accesscode'] === '7022875'
+                && $request['domain'] === 'ghana.altfon.net';
+        });
     }
 
     public function test_balance_rejects_an_account_owned_by_someone_else(): void
@@ -236,7 +243,7 @@ class InternalUssdApiTest extends TestCase
         $this->createAccount('SUB_USSD1', '7022875');
 
         Http::fake([
-            '*/booth_getbal.php' => Http::response('', 500),
+            '*/booth_getbal.php*' => Http::response('', 500),
         ]);
 
         $response = $this->internal()->postJson('/api/internal/ussd/balance', [

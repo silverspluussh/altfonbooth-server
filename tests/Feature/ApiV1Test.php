@@ -330,7 +330,7 @@ class ApiV1Test extends TestCase
         ]);
 
         Http::fake([
-            '*/booth_getbal.php' => Http::response(['status' => 'success', 'balance' => '42.50'], 200),
+            '*/booth_getbal.php*' => Http::response(['status' => 'success', 'balance' => '42.50'], 200),
         ]);
 
         $login = $this->postJson('/api/v1/login', ['username' => 'bv1', 'password' => 'password123']);

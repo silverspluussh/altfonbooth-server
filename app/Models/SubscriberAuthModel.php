@@ -4,6 +4,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class SubscriberAuthModel extends Model
 {
+    public const PASSWORD_LENGTH = 16;
+
     protected $table = 'subscriber_auth';
     protected $primaryKey = 'id';
     protected $fillable = [

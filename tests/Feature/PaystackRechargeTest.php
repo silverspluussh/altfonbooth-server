@@ -241,7 +241,7 @@ class PaystackRechargeTest extends TestCase
 
         Http::fake([
             '*/booth_topup.php' => Http::response(['status' => 'success'], 200),
-            '*/booth_getbal.php' => Http::response(['balance' => '17.50'], 200),
+            '*/booth_getbal.php*' => Http::response(['balance' => '17.50'], 200),
         ]);
 
         $payload = json_encode([

@@ -81,6 +81,14 @@ class PrepaidCreditServiceTest extends TestCase
             'status' => PrepaidCredit::STATUS_COMPLETED,
             'source' => 'web',
         ]);
+
+        Http::assertSent(function ($request) {
+            return $request->method() === 'POST'
+                && str_contains($request->url(), 'booth_topup.php')
+                && $request['accesscode'] === '7022875'
+                && (float) $request['amount'] === 10.0
+                && $request['domain'] === 'ghana.altfon.net';
+        });
     }
 
     public function test_failed_topup_stays_pending_until_retry_succeeds(): void

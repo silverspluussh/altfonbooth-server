@@ -108,6 +108,9 @@ class CountryChannelTest extends TestCase
             'subscriberid' => $subscriber->subscriberid,
             'channel' => 'mobile',
         ]);
+
+        $auth = SubscriberAuthModel::where('subscriberid', $subscriber->subscriberid)->firstOrFail();
+        $this->assertSame(SubscriberAuthModel::PASSWORD_LENGTH, strlen($auth->authpassword));
     }
 
     public function test_booth_signup_creates_booth_channel_without_country(): void
@@ -227,6 +230,55 @@ class CountryChannelTest extends TestCase
             'channel' => 'booth',
             'domain' => 'booth.altfon.net',
         ]);
+
+        SubscriberAuthModel::where('subscriberid', $subscriber->subscriberid)
+            ->get()
+            ->each(function (SubscriberAuthModel $auth) {
+                $this->assertSame(SubscriberAuthModel::PASSWORD_LENGTH, strlen($auth->authpassword));
+            });
+    }
+
+    public function test_mobile_can_create_and_update_sip_accounts_with_a_long_password(): void
+    {
+        $subscriber = $this->mobileAccount('authpassuser', '0245555000');
+
+        $login = $this->postJson('/api/v1/login', [
+            'username' => $subscriber->username,
+            'password' => 'password123',
+        ])->assertOk();
+
+        $token = $login->json('data.access_token');
+
+        $created = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->postJson('/api/auth-users')
+            ->assertCreated()
+            ->json();
+
+        $this->assertSame(SubscriberAuthModel::PASSWORD_LENGTH, strlen($created['authpassword']));
+
+        $auth = SubscriberAuthModel::where('authusername', $created['authusername'])->firstOrFail();
+
+        $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->postJson('/api/update-auth-account', [
+                'id' => $auth->id,
+                'authusername' => $auth->authusername,
+                'authpassword' => 'too-short',
+            ])
+            ->assertStatus(422);
+    }
+
+    public function test_admin_rejects_short_sip_passwords(): void
+    {
+        Http::fake();
+        $admin = $this->admin();
+        $subscriber = $this->mobileAccount('shortpassuser', '0246666000');
+
+        $this->actingAs($admin, 'admin-api')->postJson('/api/admin/auth-users', [
+            'subscriberid' => $subscriber->subscriberid,
+            'channel' => 'mobile',
+            'authusername' => '900001',
+            'authpassword' => 'too-short',
+        ])->assertStatus(422);
     }
 
     public function test_ussd_accounts_include_both_channels(): void

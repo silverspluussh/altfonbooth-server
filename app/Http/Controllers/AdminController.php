@@ -387,7 +387,7 @@ class AdminController extends Controller
             'subscriberid' => 'required|exists:subscribers,subscriberid',
             'channel' => 'required|in:mobile,booth',
             'authusername' => 'required|regex:/^\d+$/|unique:subscriber_auth,authusername',
-            'authpassword' => 'nullable|string',
+            'authpassword' => 'nullable|string|min:' . SubscriberAuthModel::PASSWORD_LENGTH . '|max:255',
             'status' => 'nullable|string|in:active,inactive,suspended',
         ]);
 
@@ -405,7 +405,7 @@ class AdminController extends Controller
             'subscriberid' => $request->subscriberid,
             'channel' => $request->channel,
             'authusername' => $request->authusername,
-            'authpassword' => $request->authpassword ?? Str::random(8),
+            'authpassword' => $request->authpassword ?? Str::random(SubscriberAuthModel::PASSWORD_LENGTH),
             'status' => $request->status ?? 'active',
         ]);
 
@@ -426,7 +426,7 @@ class AdminController extends Controller
         $request->validate([
             'channel' => 'sometimes|in:mobile,booth',
             'authusername' => 'sometimes|regex:/^\d+$/|unique:subscriber_auth,authusername,' . $id,
-            'authpassword' => 'nullable|string',
+            'authpassword' => 'nullable|string|min:' . SubscriberAuthModel::PASSWORD_LENGTH . '|max:255',
             'status' => 'nullable|string|in:active,inactive,suspended',
         ]);
 
