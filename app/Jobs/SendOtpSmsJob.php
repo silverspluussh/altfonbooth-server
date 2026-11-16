@@ -19,7 +19,9 @@ class SendOtpSmsJob implements ShouldQueue
     public function __construct(
         public string $phone,
         public string $message,
-    ) {}
+    ) {
+        $this->onQueue('sms');
+    }
 
     public function handle(): void
     {

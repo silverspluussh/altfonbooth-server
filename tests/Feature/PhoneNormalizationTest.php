@@ -81,6 +81,15 @@ class PhoneNormalizationTest extends TestCase
         );
     }
 
+    public function test_otp_sms_is_dispatched_on_the_dedicated_sms_queue(): void
+    {
+        Queue::fake();
+
+        queue_otp_sms('0249335549', 'Your OTP Code: 123456');
+
+        Queue::assertPushedOn('sms', SendOtpSmsJob::class);
+    }
+
     public function test_verify_matches_a_number_with_a_misplaced_trunk_zero(): void
     {
         $payload = $this->signup('+2330249335549', 'trunkverify');
