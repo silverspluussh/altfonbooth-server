@@ -60,4 +60,17 @@ class HelperTest extends TestCase
             return $mail->hasTo('test@example.com') && $mail->otp === '123456';
         });
     }
+
+    /**
+     * Email OTPs must not share the default queue, so a failing SMTP
+     * connection cannot delay unrelated jobs.
+     */
+    public function test_send_email_otp_uses_the_dedicated_mail_queue(): void
+    {
+        Mail::fake();
+
+        send_email_otp('test@example.com', '123456');
+
+        Mail::assertQueued(OtpMail::class, fn ($mail) => $mail->queue === 'mail');
+    }
 }
