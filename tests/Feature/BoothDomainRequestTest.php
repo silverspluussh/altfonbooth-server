@@ -83,7 +83,7 @@ class BoothDomainRequestTest extends TestCase
         });
     }
 
-    public function test_balance_requests_send_the_channel_domain_as_get_params(): void
+    public function test_balance_requests_send_the_channel_domain_as_post_params(): void
     {
         $this->accountWithBothChannels();
         $this->fakeBooth();
@@ -94,14 +94,14 @@ class BoothDomainRequestTest extends TestCase
         $booth->getBalance('222222');
 
         Http::assertSent(function ($request) {
-            return $request->method() === 'GET'
+            return $request->method() === 'POST'
                 && str_contains($request->url(), 'booth_getbal.php')
                 && $request['accesscode'] === '111111'
                 && $request['domain'] === 'ghana.altfon.net';
         });
 
         Http::assertSent(function ($request) {
-            return $request->method() === 'GET'
+            return $request->method() === 'POST'
                 && str_contains($request->url(), 'booth_getbal.php')
                 && $request['accesscode'] === '222222'
                 && $request['domain'] === 'booth.altfon.net';
@@ -146,13 +146,13 @@ class BoothDomainRequestTest extends TestCase
         $this->assertSame(10.0, $balances['222222']);
 
         Http::assertSent(function ($request) {
-            return $request->method() === 'GET'
+            return $request->method() === 'POST'
                 && $request['accesscode'] === '111111'
                 && $request['domain'] === 'ghana.altfon.net';
         });
 
         Http::assertSent(function ($request) {
-            return $request->method() === 'GET'
+            return $request->method() === 'POST'
                 && $request['accesscode'] === '222222'
                 && $request['domain'] === 'booth.altfon.net';
         });

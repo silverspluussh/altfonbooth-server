@@ -48,41 +48,11 @@ class BoothApiService
         }
     }
 
-    public function get(string $endpoint, array $params, int $timeout = 10): ?Response
-    {
-        $baseUrl = $this->baseUrl();
-
-        try {
-            $response = Http::timeout($timeout)
-                ->connectTimeout(min($timeout, 5))
-                ->get("{$baseUrl}/{$endpoint}", $params);
-
-            if (!$response->successful()) {
-                Log::warning('Booth API GET request failed', [
-                    'endpoint' => $endpoint,
-                    'params' => $params,
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
-            }
-
-            return $response;
-        } catch (\Exception $e) {
-            Log::error('Booth API GET request exception', [
-                'endpoint' => $endpoint,
-                'params' => $params,
-                'error' => $e->getMessage(),
-            ]);
-
-            return null;
-        }
-    }
-
     public function getBalance(string $accesscode, int $timeout = 10, ?string $domain = null): ?Response
     {
         $domain = $domain ?: $this->domains->forAuthUsername($accesscode);
 
-        return $this->get('booth_getbal.php', [
+        return $this->call('booth_getbal.php', [
             'accesscode' => $accesscode,
             'domain' => $domain,
         ], $timeout);
@@ -103,9 +73,10 @@ class BoothApiService
             $responses = Http::pool(function (Pool $pool) use ($accesscodes, $baseUrl, $domains) {
                 foreach ($accesscodes as $accesscode) {
                     $pool->as($accesscode)
+                        ->asForm()
                         ->timeout(3)
                         ->connectTimeout(2)
-                        ->get("{$baseUrl}/booth_getbal.php", [
+                        ->post("{$baseUrl}/booth_getbal.php", [
                             'accesscode' => $accesscode,
                             'domain' => $domains[$accesscode] ?? '',
                         ]);

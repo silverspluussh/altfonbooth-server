@@ -213,7 +213,7 @@ class InternalUssdApiTest extends TestCase
             ->assertJsonPath('data.balance', 42.5);
 
         Http::assertSent(function ($request) {
-            return $request->method() === 'GET'
+            return $request->method() === 'POST'
                 && str_contains($request->url(), 'booth_getbal.php')
                 && $request['accesscode'] === '7022875'
                 && $request['domain'] === 'ghana.altfon.net';
