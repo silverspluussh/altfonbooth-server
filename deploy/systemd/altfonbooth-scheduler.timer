@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the Altfon Booth scheduler every minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=1s
+Unit=altfonbooth-scheduler.service
+
+[Install]
+WantedBy=timers.target
